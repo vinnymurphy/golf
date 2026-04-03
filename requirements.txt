@@ -1,0 +1,9 @@
+black
+Django
+django-debug-toolbar
+factory_boy
+ipython
+isort
+ruff
+sourcery-cli
+weasyprint
