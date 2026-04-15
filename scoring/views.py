@@ -2,7 +2,7 @@ from django.forms import inlineformset_factory
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .models import Course, Hole, HoleScore, Round
+from .models import Course, Hole, HoleScore, Round, TeeSet
 
 
 def index(request):
@@ -86,3 +86,14 @@ def setup_course_holes(request, course_id):
             "hole_range": hole_range,
         },
     )
+
+
+def load_tees(request):
+    course_id = request.GET.get("course")
+    tees = TeeSet.objects.filter(course_id=course_id).order_by("color")
+    return render(request, "scoring/tee_dropdown_list_options.html", {"tees": tees})
+
+
+def start_round(request):
+    courses = Course.objects.all()
+    return render(request, "scoring/start_round.html", {"courses": courses})

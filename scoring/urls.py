@@ -11,4 +11,6 @@ urlpatterns = [
     path("round/<int:round_id>/", views.round_detail, name="round_detail"),
     # Example: /scoring/leaderboard/
     path("leaderboard/", views.leaderboard, name="leaderboard"),
+    path("ajax/load-tees/", views.load_tees, name="ajax_load_tees"),
+    path("start-round/", views.start_round, name="start_round"),
 ]
