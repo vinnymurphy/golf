@@ -14,8 +14,7 @@ class TeeSet(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="tees")
     name = models.CharField(max_length=50)
     color = models.CharField(
-        max_length=20, 
-        help_text="e.g., Blue, White, Gold, Black, or Combo"
+        max_length=20, help_text="e.g., Blue, White, Gold, Black, or Combo"
     )
     rating = models.DecimalField(
         max_digits=4, decimal_places=1, help_text="USGA Course Rating (e.g., 71.2)"

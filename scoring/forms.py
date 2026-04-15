@@ -11,15 +11,15 @@ class HoleScoreForm(forms.ModelForm):
             "putts": forms.NumberInput(attrs={"class": "form-control", "min": 0}),
         }
 
+
 class TeeSetForm(forms.ModelForm):
     class Meta:
         model = TeeSet
-        fields = ['color', 'rating', 'slope']
+        fields = ["color", "rating", "slope"]
         widgets = {
-            'color': forms.TextInput(attrs={
-                'class': 'form-control', 
-                'placeholder': 'e.g. Black'
-            }),
-            'rating': forms.NumberInput(attrs={'step': '0.1', 'class': 'form-control'}),
-            'slope': forms.NumberInput(attrs={'class': 'form-control'}),
+            "color": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "e.g. Black"}
+            ),
+            "rating": forms.NumberInput(attrs={"step": "0.1", "class": "form-control"}),
+            "slope": forms.NumberInput(attrs={"class": "form-control"}),
         }
