@@ -4,10 +4,26 @@ from django.contrib.auth.models import User
 
 class Course(models.Model):
     name = models.CharField(max_length=100)
-    location = models.CharField(max_length=100, blank=True)
+    location = models.CharField(max_length=100, default="Marion, MA")
 
     def __str__(self):
         return self.name
+
+
+class TeeSet(models.Model):
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="tees")
+    name = models.CharField(max_length=50)
+    color = models.CharField(
+        max_length=20, 
+        help_text="e.g., Blue, White, Gold, Black, or Combo"
+    )
+    rating = models.DecimalField(
+        max_digits=4, decimal_places=1, help_text="USGA Course Rating (e.g., 71.2)"
+    )
+    slope = models.IntegerField(help_text="USGA Slope Rating (usually 55-155)")
+
+    def __str__(self):
+        return f"{self.course.name} - {self.color}"
 
 
 class Hole(models.Model):

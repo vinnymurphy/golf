@@ -2,7 +2,9 @@ from django.forms import inlineformset_factory
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .models import Course, HoleScore, Round
+from .models import Course, HoleScore, Round, TeeSet
+from django.shortcuts import render, redirect, get_object_or_404
+from .models import Course, TeeSet, Hole
 
 
 def index(request):
@@ -52,3 +54,31 @@ def enter_scorecard(request, course_id):
     return render(
         request, "scoring/enter_scorecard.html", {"formset": formset, "course": course}
     )
+
+
+def setup_course_holes(request, course_id):
+    course = get_object_or_404(Course, pk=course_id)
+    tee_sets = course.tee_sets.all()
+    hole_range = range(1, 19) # 1 through 18
+
+    if request.method == "POST":
+        for number in hole_range:
+            # Get common data like Par (usually the same across tees)
+            par_value = request.POST.get(f'par_{number}')
+            
+            for tee in tee_sets:
+                yardage_value = request.POST.get(f'yardage_{tee.id}_{number}')
+                
+                # Update or create the hole record
+                Hole.objects.update_or_create(
+                    tee_set=tee,
+                    hole_number=number,
+                    defaults={'par': par_value, 'yardage': yardage_value}
+                )
+        return redirect('scoring:course_detail', course_id=course.id)
+
+    return render(request, 'scoring/setup_holes_grid.html', {
+        'course': course,
+        'tee_sets': tee_sets,
+        'hole_range': hole_range,
+    })
