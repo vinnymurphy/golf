@@ -27,7 +27,7 @@ def round_detail(request, round_id):
 
 
 def enter_scorecard(request, course_id):
-    course = Course.objects.get(pk=course_id)
+    course = get_object_or_404(Course, pk=course_id)
     # This creates a formset linked specifically between Round and HoleScore
     ScorecardFormSet = inlineformset_factory(
         Round,
