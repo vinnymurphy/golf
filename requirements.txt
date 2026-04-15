@@ -1,5 +1,6 @@
 black
 Django
+djlint
 django-debug-toolbar
 factory_boy
 ipython

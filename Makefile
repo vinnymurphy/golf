@@ -72,6 +72,8 @@ format:
 	@echo "BUILD STATUS: Formatting with Ruff..."
 	@ruff format .
 	@ruff check --fix .
+	@echo "BUILD STATUS: Formatting with djlint..."
+	@djlint . --reformat
 	@echo "RESULT: Codebase formatted and auto-fixed."
 	@echo "----------------------------------------------------------------"
 
@@ -79,6 +81,10 @@ lint:
 	@echo "----------------------------------------------------------------"
 	@echo "BUILD STATUS: Linting with Ruff..."
 	@ruff check .
+	@echo "RESULT: Linting complete."
+	@echo "----------------------------------------------------------------"
+	@echo "BUILD STATUS: Linting with djlint..."
+	@djlint . --check
 	@echo "RESULT: Linting complete."
 	@echo "----------------------------------------------------------------"
 
