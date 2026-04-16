@@ -1,0 +1,22 @@
+<h1>Scorecard for {{ round.course.name }}</h1>
+<p>Player: {{ round.user.username }} | Date: {{ round.date_played }}</p>
+<table border="1">
+    <tr>
+        <th>Hole</th>
+        <th>Par</th>
+        <th>Strokes</th>
+    </tr>
+    {% for score in round.scores.all %}
+        <tr>
+            <td>{{ score.hole.hole_number }}</td>
+            <td>{{ score.hole.par }}</td>
+            <td>{{ score.strokes }}</td>
+        </tr>
+    {% endfor %}
+    <tr style="font-weight: bold;">
+        <td>TOTAL</td>
+        <td>{{ round.total_par }}</td>
+        <td>{{ total }}</td>
+    </tr>
+</table>
+<h3>Result: {{ relative_to_par|add:"0" }}</h3>

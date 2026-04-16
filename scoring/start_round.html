@@ -1,0 +1,18 @@
+<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+<h2>Start a New Round</h2>
+<form method="GET" action="{% url 'scoring:enter_scorecard' %}">
+    <label>Select Course:</label>
+    <select name="course"
+            class="form-control"
+            hx-get="{% url 'scoring:ajax_load_tees' %}"
+            hx-target="#id_tee"
+            hx-trigger="change">
+        <option value="">---------</option>
+        {% for course in courses %}<option value="{{ course.id }}">{{ course.name }}</option>{% endfor %}
+    </select>
+    <label>Select Tee Color:</label>
+    <select name="tee" id="id_tee" class="form-control">
+        <option value="">Select a course first</option>
+    </select>
+    <button type="submit" class="btn btn-primary">Go to Scorecard</button>
+</form>

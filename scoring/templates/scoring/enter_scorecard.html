@@ -1,0 +1,33 @@
+<style>
+    .scorecard-grid {
+        display: grid;
+        grid-template-columns: repeat(10, 1fr); /* 1 for labels + 9 holes */
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    .grid-item { border: 1px solid #ccc; padding: 5px; text-align: center; }
+    .header { background: #f0f0f0; font-weight: bold; }
+    input { width: 100%; border: none; text-align: center; }
+</style>
+<form method="post" id="scorecard-form">
+    {% csrf_token %}
+    {{ formset.management_form }}
+    <h3>Front 9</h3>
+    <div class="scorecard-grid">
+        <div class="grid-item header">Hole</div>
+        {% for i in "123456789" %}<div class="grid-item header">{{ i }}</div>{% endfor %}
+        <div class="grid-item header">Score</div>
+        {% for form in formset|slice:":9" %}<div class="grid-item">{{ form.strokes }}</div>{% endfor %}
+    </div>
+    <h3>Back 9</h3>
+    <div class="scorecard-grid">
+        <div class="grid-item header">Hole</div>
+        {% for i in "10,11,12,13,14,15,16,17,18"|split:"," %}<div class="grid-item header">{{ i }}</div>{% endfor %}
+        <div class="grid-item header">Score</div>
+        {% for form in formset|slice:"9:18" %}<div class="grid-item">{{ form.strokes }}</div>{% endfor %}
+    </div>
+    <div class="total-display">
+        <strong>Running Total: <span id="live-total">0</span></strong>
+    </div>
+    <button type="submit">Post Scorecard</button>
+</form>
