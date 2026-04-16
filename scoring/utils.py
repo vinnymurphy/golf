@@ -1,8 +1,10 @@
+from .models import Round
+
+
 def calculate_handicap(player_user):
-    from .models import Round
 
     # 1. Get the 20 most recent rounds
-    rounds = Round.objects.filter(player=player_user).order_by("-date_played")[:20]
+    rounds = Round.objects.filter(user=player_user).order_by("-date_played")[:20]
     count = rounds.count()
 
     if count < 3:

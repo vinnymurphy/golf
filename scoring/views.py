@@ -129,3 +129,8 @@ def leaderboard_view(request):
     return render(
         request, "scoring/leaderboard.html", {"leaderboard": leaderboard_data}
     )
+
+
+def add_round(request):
+    # For now, just a placeholder so the URL works
+    return render(request, "scoring/add_round.html")

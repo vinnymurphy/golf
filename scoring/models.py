@@ -39,6 +39,7 @@ class Round(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
     date_played = models.DateTimeField(auto_now_add=True)
+    differential = models.DecimalField(max_digits=5, decimal_places=2, editable=False)
 
     @property
     def total_score(self):
@@ -58,6 +59,18 @@ class Round(models.Model):
 
     def __str__(self):
         return f"{self.user.username} at {self.course.name} ({self.date_played.date()})"
+
+    def save(self, *args, **kwargs):
+        # We need the Slope and Rating from the TeeSet to do the math.
+        # This assumes your Round model has a 'tee_set' foreign key.
+        if not self.differential:
+            # Formula: (Score - Rating) * 113 / Slope
+            # We use float() because Decimal and float don't always mix well in Python math
+            diff = (float(self.total_score) - float(self.tee_set.rating)) * (
+                113 / self.tee_set.slope
+            )
+            self.differential = diff
+        super().save(*args, **kwargs)
 
 
 class HoleScore(models.Model):
