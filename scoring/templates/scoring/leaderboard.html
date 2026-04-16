@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block content %}
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Buddy Handicap Leaderboard</h2>
+            <a href="{% url 'scoring:add_round' %}" class="btn btn-success">+ Post Round</a>
+        </div>
+        <table class="table table-hover shadow-sm bg-white">
+            <thead class="table-dark">
+                <tr>
+                    <th>Rank</th>
+                    <th>Player</th>
+                    <th>Handicap Index</th>
+                    <th>Recent Scores</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in leaderboard %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>
+                            <strong>{{ entry.user.username }}</strong>
+                        </td>
+                        <td>
+                            <span class="badge bg-primary fs-6">{{ entry.handicap }}</span>
+                        </td>
+                        <td>
+                            {% for score in entry.recent_scores %}
+                                <small class="text-muted">{{ score }}</small>
+                                {% if not forloop.last %},{% endif %}
+                            {% empty %}
+                                <small class="text-muted">No rounds yet</small>
+                            {% endfor %}
+                        </td>
+                        <td>
+                            {% if entry.sort_val < 10 %}
+                                <span class="text-danger">🔥 Scratch Threat</span>
+                            {% elif entry.sort_val == 99.9 %}
+                                <span class="text-muted">In Training</span>
+                            {% else %}
+                                <span class="text-success">Active</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

@@ -1,8 +1,10 @@
+from django.contrib.auth.models import User
 from django.forms import inlineformset_factory
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .models import Course, Hole, HoleScore, Round, TeeSet
+from .utils import calculate_handicap
 
 
 def index(request):
@@ -97,3 +99,33 @@ def load_tees(request):
 def start_round(request):
     courses = Course.objects.all()
     return render(request, "scoring/start_round.html", {"courses": courses})
+
+
+# scoring/views.py
+
+
+def leaderboard_view(request):
+    buddies = User.objects.all()
+    leaderboard_data = []
+
+    for buddy in buddies:
+        # Update: Use 'user' instead of 'player'
+        # Update: Use 'date_played' instead of 'date'
+        recent_rounds = Round.objects.filter(user=buddy).order_by("-date_played")[:5]
+
+        handicap = calculate_handicap(buddy)
+
+        leaderboard_data.append(
+            {
+                "user": buddy,
+                "handicap": handicap if handicap is not None else "N/A",
+                # Ensure this matches your field name (the error says 'scores')
+                "recent_scores": [r.scores for r in recent_rounds],
+                "sort_val": handicap if handicap is not None else 99.9,
+            }
+        )
+
+    leaderboard_data.sort(key=lambda x: x["sort_val"])
+    return render(
+        request, "scoring/leaderboard.html", {"leaderboard": leaderboard_data}
+    )

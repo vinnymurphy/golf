@@ -75,6 +75,10 @@ format:
 	@echo "BUILD STATUS: Formatting with djlint..."
 	@djlint . --reformat
 	@echo "RESULT: Codebase formatted and auto-fixed."
+	@isort .
+	@echo "RESULT: Imports sorted with isort."
+	@black .
+	@echo "RESULT: Codebase formatted with Black."
 	@echo "----------------------------------------------------------------"
 
 lint:
