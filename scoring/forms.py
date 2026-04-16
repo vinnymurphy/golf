@@ -25,6 +25,7 @@ class TeeSetForm(forms.ModelForm):
             "slope": forms.NumberInput(attrs={"class": "form-control"}),
         }
 
+"""
 
 class RoundForm(forms.ModelForm):
     class Meta:
@@ -46,3 +47,4 @@ class RoundForm(forms.ModelForm):
         # Standardizing the labels for your buddies
         self.fields["tee_set"].label = "Tee Color / Set"
         self.fields["scores"].label = "Total Gross Score"
+"""

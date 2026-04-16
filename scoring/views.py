@@ -1,8 +1,10 @@
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.forms import inlineformset_factory
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
+#from .forms import RoundForm
 from .models import Course, Hole, HoleScore, Round, TeeSet
 from .utils import calculate_handicap
 
@@ -93,7 +95,9 @@ def setup_course_holes(request, course_id):
 def load_tees(request):
     course_id = request.GET.get("course")
     tees = TeeSet.objects.filter(course_id=course_id).order_by("color")
-    return render(request, "scoring/tee_dropdown_list_options.html", {"tees": tees})
+    return render(
+        request, "scoring/tee_dropdown_list_options.html", {"tees": tees}
+    )
 
 
 def start_round(request):
@@ -101,17 +105,14 @@ def start_round(request):
     return render(request, "scoring/start_round.html", {"courses": courses})
 
 
-# scoring/views.py
-
-
 def leaderboard_view(request):
     buddies = User.objects.all()
     leaderboard_data = []
 
     for buddy in buddies:
-        # Update: Use 'user' instead of 'player'
-        # Update: Use 'date_played' instead of 'date'
-        recent_rounds = Round.objects.filter(user=buddy).order_by("-date_played")[:5]
+        recent_rounds = Round.objects.filter(user=buddy).order_by(
+            "-date_played"
+        )[:5]
 
         handicap = calculate_handicap(buddy)
 
@@ -130,7 +131,19 @@ def leaderboard_view(request):
         request, "scoring/leaderboard.html", {"leaderboard": leaderboard_data}
     )
 
-
+@login_required
 def add_round(request):
-    # For now, just a placeholder so the URL works
-    return render(request, "scoring/add_round.html")
+    if request.method == "POST":
+        form = RoundForm(request.POST)
+        if form.is_valid():
+            # commit=False gives us a model instance before it hits the DB
+            new_round = form.save(commit=False)
+            # Assign the current logged-in buddy
+            new_round.user = request.user
+            # Now save to DB, triggering your custom save() math for the differential
+            new_round.save()
+            return redirect("scoring:leaderboard")
+    else:
+        form = RoundForm()
+
+    return render(request, "scoring/add_round.html", {"form": form})

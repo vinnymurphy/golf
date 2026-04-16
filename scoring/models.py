@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import models
+from django.utils import timezone
 
 
 class Course(models.Model):
@@ -37,10 +38,22 @@ class Hole(models.Model):
 
 class Round(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    course = models.ForeignKey(Course, on_delete=models.CASCADE)
-    date_played = models.DateTimeField(auto_now_add=True)
+    course = models.ForeignKey('Course', on_delete=models.CASCADE)
+    # Add this line!
+    tee_set = models.ForeignKey('TeeSet', on_delete=models.SET_NULL, null=True)
+    
+    date_played = models.DateField(default=timezone.now)
+    # Ensure this matches the 'scores' name in your Choice list
+    scores = models.IntegerField() 
     differential = models.DecimalField(max_digits=5, decimal_places=2, editable=False)
 
+    def save(self, *args, **kwargs):
+        # Only calculate if we have a score and a tee_set
+        if not self.differential and self.tee_set:
+            diff = (float(self.scores) - float(self.tee_set.rating)) * (113 / self.tee_set.slope)
+            self.differential = diff
+        super().save(*args, **kwargs)
+            
     @property
     def total_score(self):
         return (
@@ -74,7 +87,7 @@ class Round(models.Model):
 
 
 class HoleScore(models.Model):
-    round = models.ForeignKey(Round, on_delete=models.CASCADE, related_name="scores")
+    round = models.ForeignKey(Round, on_delete=models.CASCADE, related_name="hole_scores")
     hole = models.ForeignKey(Hole, on_delete=models.CASCADE)
     strokes = models.IntegerField()
     putts = models.IntegerField(default=0)
