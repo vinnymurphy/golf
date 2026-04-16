@@ -25,6 +25,7 @@ class TeeSetForm(forms.ModelForm):
             "slope": forms.NumberInput(attrs={"class": "form-control"}),
         }
 
+
 class RoundForm(forms.ModelForm):
     class Meta:
         model = Round

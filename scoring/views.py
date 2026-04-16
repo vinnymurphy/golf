@@ -95,9 +95,7 @@ def setup_course_holes(request, course_id):
 def load_tees(request):
     course_id = request.GET.get("course")
     tees = TeeSet.objects.filter(course_id=course_id).order_by("color")
-    return render(
-        request, "scoring/tee_dropdown_list_options.html", {"tees": tees}
-    )
+    return render(request, "scoring/tee_dropdown_list_options.html", {"tees": tees})
 
 
 def start_round(request):
@@ -110,9 +108,7 @@ def leaderboard_view(request):
     leaderboard_data = []
 
     for buddy in buddies:
-        recent_rounds = Round.objects.filter(user=buddy).order_by(
-            "-date_played"
-        )[:5]
+        recent_rounds = Round.objects.filter(user=buddy).order_by("-date_played")[:5]
 
         handicap = calculate_handicap(buddy)
 
@@ -130,6 +126,7 @@ def leaderboard_view(request):
     return render(
         request, "scoring/leaderboard.html", {"leaderboard": leaderboard_data}
     )
+
 
 @login_required
 def add_round(request):
