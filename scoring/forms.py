@@ -29,13 +29,14 @@ class TeeSetForm(forms.ModelForm):
 class RoundForm(forms.ModelForm):
     class Meta:
         model = Round
-        fields = ["course", "tee_set", "date_played", "scores"]
+        fields = ["course", "tee_set", "holes_played", "date_played", "scores"]
         widgets = {
             "date_played": forms.DateInput(
                 attrs={"type": "date", "class": "form-control"}
             ),
             "course": forms.Select(attrs={"class": "form-select"}),
             "tee_set": forms.Select(attrs={"class": "form-select"}),
+            "holes_played": forms.Select(attrs={"class": "form-select"}),
             "scores": forms.NumberInput(
                 attrs={"class": "form-control", "placeholder": "Gross Score"}
             ),

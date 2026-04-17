@@ -39,8 +39,9 @@ class Hole(models.Model):
 class Round(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     course = models.ForeignKey("Course", on_delete=models.CASCADE)
-    # Add this line!
     tee_set = models.ForeignKey("TeeSet", on_delete=models.SET_NULL, null=True)
+    HOLE_CHOICES = [(9, "9 Holes"), (18, "18 Holes")]
+    holes_played = models.IntegerField(choices=HOLE_CHOICES, default=18)
 
     date_played = models.DateField(default=timezone.now)
     # Ensure this matches the 'scores' name in your Choice list
@@ -48,16 +49,19 @@ class Round(models.Model):
     differential = models.DecimalField(max_digits=5, decimal_places=2, editable=False)
 
     def save(self, *args, **kwargs):
-        # We need the Slope and Rating from the TeeSet to do the math.
-        # This assumes your Round model has a 'tee_set' foreign key.
-        if not self.differential:
-            # Formula: (Score - Rating) * 113 / Slope
-            # We use float() because Decimal and float don't always mix well in Python math
-            diff = (float(self.total_score) - float(self.tee_set.rating)) * (
+        if not self.differential and self.tee_set:
+            # WHS 9-hole math: (Score - 9-hole Rating) * 113 / 9-hole Slope
+            # Note: This assumes your TeeSet stores the 9-hole rating/slope
+            # if that's what is being played.
+
+            raw_diff = (float(self.scores) - float(self.tee_set.rating)) * (
                 113 / self.tee_set.slope
             )
-            self.differential = diff
-        super().save(*args, **kwargs)
+
+            # If it's a 9-hole round, the differential is handled
+            # specifically by the handicap index (often doubled or combined)
+            # For now, we store the raw differential of the play.
+            self.differential = raw_diff
 
     @property
     def total_score(self):

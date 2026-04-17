@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow">
+        <div class="card-header bg-success text-white">
+            <h3 class="mb-0">Start a New Round</h3>
+        </div>
+        <div class="card-body">
+            <form method="post" action="{% url 'scoring:add_round' %}">
+                {% csrf_token %}
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="id_course" class="form-label font-weight-bold">Select Course</label>
+                        {{ form.course }}
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="id_tee_set" class="form-label font-weight-bold">Tee Color / Set</label>
+                        {{ form.tee_set }}
+                        <small class="text-muted">Yardages will adjust based on this selection.</small>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="id_holes_played" class="form-label font-weight-bold">Holes to Play</label>
+                        {{ form.holes_played }}
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="id_date_played" class="form-label font-weight-bold">Date</label>
+                        {{ form.date_played }}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="id_scores" class="form-label font-weight-bold">Total Gross Score (Optional for Hole-by-Hole)</label>
+                    {{ form.scores }}
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-success btn-lg">Next: Enter Hole Scores</button>
+                    <a href="{% url 'scoring:leaderboard' %}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
