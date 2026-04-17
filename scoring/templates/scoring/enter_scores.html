@@ -9,14 +9,12 @@
     </thead>
     <tbody>
         {% for form, hole in forms_with_holes %}
-        <tr>
-            <td>{{ hole.hole_number }}</td>
-            <td>{{ hole.current_yardage.yards|default:"--" }}</td>
-            <td>{{ hole.par }}</td>
-            <td>
-                {{ form.id }} {{ form.strokes }}
-            </td>
-        </tr>
+            <tr>
+                <td>{{ hole.hole_number }}</td>
+                <td>{{ hole.current_yardage.yards|default:"--" }}</td>
+                <td>{{ hole.par }}</td>
+                <td>{{ form.id }} {{ form.strokes }}</td>
+            </tr>
         {% endfor %}
     </tbody>
 </table>
