@@ -38,7 +38,7 @@ class RoundForm(forms.ModelForm):
     class Meta:
         model = Round
         # fields = ["course", "tee_set", "holes_played", "date_played", "scores"]
-        fields = ["course",  "holes_played", "date_played", "scores"]
+        fields = ["course", "holes_played", "date_played", "scores"]
         widgets = {
             "date_played": forms.DateInput(
                 attrs={"type": "date", "class": "form-control"}
@@ -46,13 +46,11 @@ class RoundForm(forms.ModelForm):
             "course": forms.Select(attrs={"class": "form-select"}),
             # "tee_set": forms.Select(attrs={"class": "form-select"}),
             "holes_played": forms.Select(attrs={"class": "form-select"}),
-            "scores": forms.NumberInput(
-                attrs={"class": "form-control", "placeholder": "Gross Score"}
-            ),
+            # "scores": forms.NumberInput(                attrs={"class": "form-control", "placeholder": "Gross Score"}            ),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Standardizing the labels for your buddies
-        self.fields["tee_set"].label = "Tee Color / Set"
-        self.fields["scores"].label = "Total Gross Score"
+        # self.fields["tee_set"].label = "Tee Color / Set"
+        # self.fields["scores"].label = "Total Gross Score"

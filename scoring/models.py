@@ -39,7 +39,6 @@ class Hole(models.Model):
 class Round(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     course = models.ForeignKey("Course", on_delete=models.CASCADE)
-    # Make sure these names are EXACTLY as written here:
     date = models.DateField(default=timezone.now) 
     total_gross_score = models.IntegerField(default=0)
     completed_holes = models.IntegerField(default=18)
@@ -47,8 +46,7 @@ class Round(models.Model):
     holes_played = models.IntegerField(choices=HOLE_CHOICES, default=18)
 
     date_played = models.DateField(default=timezone.now)
-    # Ensure this matches the 'scores' name in your Choice list
-    scores = models.IntegerField()
+    scores = models.IntegerField(default=0)
     differential = models.DecimalField(max_digits=5, decimal_places=2, editable=False)
     external_url = models.URLField(max_length=500, null=True, blank=True)
 
