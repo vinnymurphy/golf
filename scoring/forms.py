@@ -37,20 +37,10 @@ class TeeSetForm(forms.ModelForm):
 class RoundForm(forms.ModelForm):
     class Meta:
         model = Round
-        # fields = ["course", "tee_set", "holes_played", "date_played", "scores"]
-        fields = ["course", "holes_played", "date_played", "scores"]
-        widgets = {
-            "date_played": forms.DateInput(
-                attrs={"type": "date", "class": "form-control"}
-            ),
-            "course": forms.Select(attrs={"class": "form-select"}),
-            # "tee_set": forms.Select(attrs={"class": "form-select"}),
-            "holes_played": forms.Select(attrs={"class": "form-select"}),
-            # "scores": forms.NumberInput(                attrs={"class": "form-control", "placeholder": "Gross Score"}            ),
-        }
+        # Ensure this is a simple list of strings. 
+        # Check for any accidental nested brackets like [["course"]]
+        fields = ["course"] 
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Standardizing the labels for your buddies
-        # self.fields["tee_set"].label = "Tee Color / Set"
-        # self.fields["scores"].label = "Total Gross Score"
+        # Leave all custom logic commented out until the migration passes

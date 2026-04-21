@@ -42,11 +42,6 @@ class Round(models.Model):
     date = models.DateField(default=timezone.now) 
     total_gross_score = models.IntegerField(default=0)
     completed_holes = models.IntegerField(default=18)
-    HOLE_CHOICES = [(9, "9 Holes"), (18, "18 Holes")]
-    holes_played = models.IntegerField(choices=HOLE_CHOICES, default=18)
-
-    date_played = models.DateField(default=timezone.now)
-    scores = models.IntegerField(default=0)
     differential = models.DecimalField(max_digits=5, decimal_places=2, editable=False)
     external_url = models.URLField(max_length=500, null=True, blank=True)
 
