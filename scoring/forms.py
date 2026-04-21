@@ -1,7 +1,15 @@
 from django import forms
+from django.forms import inlineformset_factory
+from .models import Round, HoleScore, TeeSet
 
-from .models import HoleScore, Round, TeeSet
-
+# This defines how a "Collection" of HoleScores relates to a Round
+HoleScoreFormSet = inlineformset_factory(
+    Round,
+    HoleScore,
+    fields=["strokes", "putts"],
+    extra=18,           # Pre-fills 18 holes
+    can_delete=False,   # Prevents accidental deletion of holes during entry
+)
 
 class HoleScoreForm(forms.ModelForm):
     class Meta:
@@ -29,13 +37,14 @@ class TeeSetForm(forms.ModelForm):
 class RoundForm(forms.ModelForm):
     class Meta:
         model = Round
-        fields = ["course", "tee_set", "holes_played", "date_played", "scores"]
+        # fields = ["course", "tee_set", "holes_played", "date_played", "scores"]
+        fields = ["course",  "holes_played", "date_played", "scores"]
         widgets = {
             "date_played": forms.DateInput(
                 attrs={"type": "date", "class": "form-control"}
             ),
             "course": forms.Select(attrs={"class": "form-select"}),
-            "tee_set": forms.Select(attrs={"class": "form-select"}),
+            # "tee_set": forms.Select(attrs={"class": "form-select"}),
             "holes_played": forms.Select(attrs={"class": "form-select"}),
             "scores": forms.NumberInput(
                 attrs={"class": "form-control", "placeholder": "Gross Score"}

@@ -27,7 +27,7 @@ class TeeSet(models.Model):
 
 
 class Hole(models.Model):
-    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="holes")
+    tee_set = models.ForeignKey(TeeSet, on_delete=models.CASCADE, related_name="holes", null=True, blank=True)
     hole_number = models.IntegerField()
     par = models.IntegerField(default=4)
     yardage = models.IntegerField(blank=True, null=True)
@@ -39,7 +39,10 @@ class Hole(models.Model):
 class Round(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     course = models.ForeignKey("Course", on_delete=models.CASCADE)
-    tee_set = models.ForeignKey("TeeSet", on_delete=models.SET_NULL, null=True)
+    # Make sure these names are EXACTLY as written here:
+    date = models.DateField(default=timezone.now) 
+    total_gross_score = models.IntegerField(default=0)
+    completed_holes = models.IntegerField(default=18)
     HOLE_CHOICES = [(9, "9 Holes"), (18, "18 Holes")]
     holes_played = models.IntegerField(choices=HOLE_CHOICES, default=18)
 
@@ -47,6 +50,7 @@ class Round(models.Model):
     # Ensure this matches the 'scores' name in your Choice list
     scores = models.IntegerField()
     differential = models.DecimalField(max_digits=5, decimal_places=2, editable=False)
+    external_url = models.URLField(max_length=500, null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if not self.differential and self.tee_set:

@@ -8,6 +8,14 @@ from .forms import RoundForm
 from .models import Course, Hole, HoleScore, Round, TeeSet
 from .utils import calculate_handicap
 
+from django.forms import inlineformset_factory
+
+HoleScoreFormSet = inlineformset_factory(
+    Round, 
+    HoleScore, 
+    fields=["strokes", "putts"], 
+    extra=18
+)
 
 def index(request):
     return HttpResponse("Welcome to the Golf Scoring Dashboard!")
