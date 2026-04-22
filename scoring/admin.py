@@ -27,11 +27,11 @@ class TeeSetAdmin(admin.ModelAdmin):
     inlines = [HoleInline]
 
 
-# @admin.register(Round)
-# class RoundAdmin(admin.ModelAdmin):
-#     list_display = ("date", "user", "course", "total_gross_score", "completed_holes")
-#     list_filter = ("course", "user", "date")
-admin.site.register(Round)
+@admin.register(Round)
+class RoundAdmin(admin.ModelAdmin):
+    # Make sure 'tee_set' is NOT in this list
+    list_display = ("date", "course", "total_gross_score", "completed_holes") 
+    list_filter = ("course", "date")
 
 # Register the rest simply
 admin.site.register(Hole)

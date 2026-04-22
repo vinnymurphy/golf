@@ -37,10 +37,12 @@ class TeeSetForm(forms.ModelForm):
 class RoundForm(forms.ModelForm):
     class Meta:
         model = Round
-        # Ensure this is a simple list of strings. 
-        # Check for any accidental nested brackets like [["course"]]
-        fields = ["course"] 
+        # We define fields as a tuple here to prevent the 'list' TypeError you saw earlier
+        fields = ("course", "date", "total_gross_score", "completed_holes")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Leave all custom logic commented out until the migration passes
+        # We use .get() to avoid crashing if the field is missing during a system check
+        if self.fields.get("total_gross_score"):
+            self.fields["total_gross_score"].label = "Total Gross Score"
+        
