@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import Course, TeeSet, Hole, Round, HoleScore
+
+from .models import Course, Hole, HoleScore, Round, TeeSet
 
 
 # This lets you edit Tee Sets while looking at a Course
@@ -30,8 +31,9 @@ class TeeSetAdmin(admin.ModelAdmin):
 @admin.register(Round)
 class RoundAdmin(admin.ModelAdmin):
     # Make sure 'tee_set' is NOT in this list
-    list_display = ("date", "course", "total_gross_score", "completed_holes") 
+    list_display = ("date", "course", "total_gross_score", "completed_holes")
     list_filter = ("course", "date")
+
 
 # Register the rest simply
 admin.site.register(Hole)

@@ -1,7 +1,8 @@
 import csv
+
 from django.core.management.base import BaseCommand
-from django.contrib.auth.models import User
-from scoring.models import Course, Round, TeeSet
+
+from scoring.models import Course, TeeSet
 
 
 class Command(BaseCommand):
@@ -12,8 +13,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # We'll assume 'vmurphy' is your user based on your system logs
-        user = User.objects.get(username="vmurphy")
-
         with open(options["csv_file"], newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
@@ -31,15 +30,6 @@ class Command(BaseCommand):
                     defaults={"rating": 71.2, "slope": 113},  # Placeholders
                 )
 
-                # 3. Create the Round
-                new_round = Round.objects.create(
-                    user=user,
-                    course=course,
-                    # You might need to add a date field to your Round model if you haven't!
-                    # date=row["date"]
-                )
-
-                # 4. Log the Gross Score
                 # Since the CSV doesn't have hole-by-hole, we might want to
                 # store the 'gross score' in a summary field on the Round model
                 # or create a dummy HoleScore for now.

@@ -27,7 +27,9 @@ class TeeSet(models.Model):
 
 
 class Hole(models.Model):
-    tee_set = models.ForeignKey(TeeSet, on_delete=models.CASCADE, related_name="holes", null=True, blank=True)
+    tee_set = models.ForeignKey(
+        TeeSet, on_delete=models.CASCADE, related_name="holes", null=True, blank=True
+    )
     hole_number = models.IntegerField()
     par = models.IntegerField(default=4)
     yardage = models.IntegerField(blank=True, null=True)
@@ -39,54 +41,39 @@ class Hole(models.Model):
 class Round(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     course = models.ForeignKey("Course", on_delete=models.CASCADE)
-    date = models.DateField(default=timezone.now) 
+    date = models.DateField(default=timezone.now)
     total_gross_score = models.IntegerField(default=0)
     completed_holes = models.IntegerField(default=18)
-    differential = models.DecimalField(max_digits=5, decimal_places=2, editable=False)
+    # We allow null=True here so the import can save before calculating the diff
+    differential = models.DecimalField(
+        max_digits=5, decimal_places=2, editable=False, null=True, blank=True
+    )
     external_url = models.URLField(max_length=500, null=True, blank=True)
 
     def save(self, *args, **kwargs):
-        if not self.differential and self.tee_set:
-            # WHS 9-hole math: (Score - 9-hole Rating) * 113 / 9-hole Slope
-            # Note: This assumes your TeeSet stores the 9-hole rating/slope
-            # if that's what is being played.
+        # 1. FIXED: We removed 'tee_set' from Round, so we skip calculation here
+        # We can calculate the handicap differential later via a utility function
+        # since it now requires looking up the HoleScores to find the TeeSet.
+        if not self.differential:
+            self.differential = 0.00
 
-            raw_diff = (float(self.scores) - float(self.tee_set.rating)) * (
-                113 / self.tee_set.slope
-            )
-
-            # If it's a 9-hole round, the differential is handled
-            # specifically by the handicap index (often doubled or combined)
-            # For now, we store the raw differential of the play.
-            self.differential = raw_diff
+        super().save(*args, **kwargs)
 
     @property
     def total_score(self):
-        return (
-            self.scores.aggregate(models.Sum("strokes"))["strokes__sum"]
-            if self.scores.exists()
-            else 0
-        )
-
-    @property
-    def total_par(self):
-        return (
-            self.scores.aggregate(models.Sum("hole__par"))["hole__par__sum"]
-            if self.scores.exists()
-            else 0
-        )
+        if hasattr(self, "hole_scores"):
+            return self.hole_scores.aggregate(models.Sum("score"))["score__sum"] or 0
+        return self.total_gross_score
 
     def __str__(self):
-        return f"{self.user.username} at {self.course.name} ({self.date_played.date()})"
+        return f"{self.user.username} at {self.course.name} ({self.date})"
 
 
 class HoleScore(models.Model):
-    round = models.ForeignKey(
-        Round, on_delete=models.CASCADE, related_name="hole_scores"
-    )
+    round = models.ForeignKey(Round, on_delete=models.CASCADE, related_name="scores")
     hole = models.ForeignKey(Hole, on_delete=models.CASCADE)
     strokes = models.IntegerField()
     putts = models.IntegerField(default=0)
 
     def __str__(self):
-        return f"Hole {self.hole.hole_number}: {self.strokes} strokes"
+        return f"{self.round.user.first_name} - Hole {self.hole.hole_number}: {self.strokes} strokes"

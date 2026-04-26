@@ -8,14 +8,10 @@ from .forms import RoundForm
 from .models import Course, Hole, HoleScore, Round, TeeSet
 from .utils import calculate_handicap
 
-from django.forms import inlineformset_factory
-
 HoleScoreFormSet = inlineformset_factory(
-    Round, 
-    HoleScore, 
-    fields=["strokes", "putts"], 
-    extra=18
+    Round, HoleScore, fields=["strokes", "putts"], extra=18
 )
+
 
 def index(request):
     return HttpResponse("Welcome to the Golf Scoring Dashboard!")
@@ -116,7 +112,7 @@ def leaderboard_view(request):
     leaderboard_data = []
 
     for buddy in buddies:
-        recent_rounds = Round.objects.filter(user=buddy).order_by("-date_played")[:5]
+        recent_rounds = Round.objects.filter(user=buddy).order_by("-date")[:5]
 
         handicap = calculate_handicap(buddy)
 
@@ -125,7 +121,7 @@ def leaderboard_view(request):
                 "user": buddy,
                 "handicap": handicap if handicap is not None else "N/A",
                 # Ensure this matches your field name (the error says 'scores')
-                "recent_scores": [r.scores for r in recent_rounds],
+                "recent_scores": [r.total_score for r in recent_rounds],
                 "sort_val": handicap if handicap is not None else 99.9,
             }
         )

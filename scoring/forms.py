@@ -1,15 +1,17 @@
 from django import forms
 from django.forms import inlineformset_factory
-from .models import Round, HoleScore, TeeSet
+
+from .models import HoleScore, Round, TeeSet
 
 # This defines how a "Collection" of HoleScores relates to a Round
 HoleScoreFormSet = inlineformset_factory(
     Round,
     HoleScore,
     fields=["strokes", "putts"],
-    extra=18,           # Pre-fills 18 holes
-    can_delete=False,   # Prevents accidental deletion of holes during entry
+    extra=18,  # Pre-fills 18 holes
+    can_delete=False,  # Prevents accidental deletion of holes during entry
 )
+
 
 class HoleScoreForm(forms.ModelForm):
     class Meta:
@@ -45,4 +47,3 @@ class RoundForm(forms.ModelForm):
         # We use .get() to avoid crashing if the field is missing during a system check
         if self.fields.get("total_gross_score"):
             self.fields["total_gross_score"].label = "Total Gross Score"
-        
