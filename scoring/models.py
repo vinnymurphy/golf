@@ -34,6 +34,9 @@ class Hole(models.Model):
     par = models.IntegerField(default=4)
     yardage = models.IntegerField(blank=True, null=True)
 
+    def __str__(self):
+        return f"{self.tee_set}, {self.hole_number}"
+
     class Meta:
         ordering = ["hole_number"]
 
@@ -51,9 +54,6 @@ class Round(models.Model):
     external_url = models.URLField(max_length=500, null=True, blank=True)
 
     def save(self, *args, **kwargs):
-        # 1. FIXED: We removed 'tee_set' from Round, so we skip calculation here
-        # We can calculate the handicap differential later via a utility function
-        # since it now requires looking up the HoleScores to find the TeeSet.
         if not self.differential:
             self.differential = 0.00
 
