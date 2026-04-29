@@ -84,15 +84,20 @@ class Round(models.Model):
             return None
 
         try:
-            # 9-hole scaling check
-            if self.completed_holes == 9:
-                rating = Decimal(str(tee.rating)) / 2
-                slope = Decimal(str(tee.slope)) / 2
-            else:
-                rating = Decimal(str(tee.rating))
-                slope = Decimal(str(tee.slope))
+            # Use full 18-hole ratings for both scenarios
+            rating = Decimal(str(tee.rating))
+            slope = Decimal(str(tee.slope))
 
-            self.differential = (Decimal("113") / slope) * (gross - rating)
+            if self.completed_holes == 9:
+                # 1. Double the score to see the 18-hole "pace"
+                # 2. Calculate the 18-hole differential
+                # 3. Divide by 2 to get the 9-hole value
+                full_diff = (Decimal("113") / slope) * ((gross * 2) - rating)
+                self.differential = full_diff / 2
+            else:
+                # Standard 18-hole calculation
+                self.differential = (Decimal("113") / slope) * (gross - rating)
+            
             return self.differential
         except Exception:
             return None
