@@ -20,7 +20,7 @@
                     <tr>
                         <td>{{ forloop.counter }}</td>
                         <td>
-                            <strong>{{ entry.user.username }}</strong>
+                            <strong>{{ entry.user.first_name }}</strong>
                         </td>
                         <td>
                             <span class="badge bg-primary fs-6">{{ entry.handicap }}</span>
@@ -28,7 +28,6 @@
                         <td>
                             {% for score in entry.recent_scores %}
                                 <small class="text-muted">{{ score }}</small>
-                                {% if not forloop.last %},{% endif %}
                             {% empty %}
                                 <small class="text-muted">No rounds yet</small>
                             {% endfor %}
