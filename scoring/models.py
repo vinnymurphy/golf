@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone
@@ -53,20 +55,64 @@ class Round(models.Model):
     )
     external_url = models.URLField(max_length=500, null=True, blank=True)
 
-    def save(self, *args, **kwargs):
-        if not self.differential:
-            self.differential = 0.00
-
-        super().save(*args, **kwargs)
-
     @property
     def total_score(self):
-        if hasattr(self, "hole_scores"):
-            return self.hole_scores.aggregate(models.Sum("score"))["score__sum"] or 0
+        # Use 'scores' because that is the related_name we set in the migration
+        if self.scores.exists():
+            return self.scores.aggregate(models.Sum("strokes"))[
+                "strokes__sum"
+            ] or Decimal("0.00")
         return self.total_gross_score
+
+    def update_differential(self):
+        all_scores = self.scores.all()
+        
+        # Scenario A: We have individual HoleScores
+        if all_scores.exists():
+            gross = Decimal(str(sum(s.strokes for s in all_scores)))
+            self.total_gross_score = int(gross)
+            tee = all_scores.first().hole.tee_set
+            
+        # Scenario B: No HoleScores (CSV Import Fallback)
+        else:
+            gross = Decimal(str(self.total_gross_score))
+            # Find the TeeSet associated with this course. 
+            # We use .first() as a safe default for historical data.
+            tee = self.course.tees.first() 
+
+        if not tee or gross == 0:
+            return None
+
+        try:
+            # 9-hole scaling check
+            if self.completed_holes == 9:
+                rating = Decimal(str(tee.rating)) / 2
+                slope = Decimal(str(tee.slope)) / 2
+            else:
+                rating = Decimal(str(tee.rating))
+                slope = Decimal(str(tee.slope))
+
+            self.differential = (Decimal("113") / slope) * (gross - rating)
+            return self.differential
+        except Exception:
+            return None
+        
 
     def __str__(self):
         return f"{self.user.username} at {self.course.name} ({self.date})"
+
+    def save(self, *args, **kwargs):
+        # On updates (when the round already exists in the DB),
+        # we can try to recalculate the differential.
+        if self.pk:
+            self.update_differential()
+
+        # If it's a new round and differential is still null,
+        # default to 0.0 so the DB doesn't complain
+        if self.differential is None:
+            self.differential = Decimal("0.00")
+
+        super().save(*args, **kwargs)
 
 
 class HoleScore(models.Model):

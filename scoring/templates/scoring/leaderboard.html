@@ -27,8 +27,7 @@
                         </td>
                         <td>
                             {% for score in entry.recent_scores %}
-                                <small class="text-muted">{{ score.strokes }}</small>
-                                {% if not forloop.last %},{% endif %}
+                                <small class="text-muted">{{ score }}</small>
                             {% empty %}
                                 <small class="text-muted">No rounds yet</small>
                             {% endfor %}
