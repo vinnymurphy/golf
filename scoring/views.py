@@ -8,6 +8,10 @@ from .forms import RoundForm
 from .models import Course, Hole, HoleScore, Round, TeeSet
 from .utils import calculate_handicap
 
+HoleScoreFormSet = inlineformset_factory(
+    Round, HoleScore, fields=["strokes", "putts"], extra=18
+)
+
 
 def index(request):
     return HttpResponse("Welcome to the Golf Scoring Dashboard!")
@@ -108,7 +112,7 @@ def leaderboard_view(request):
     leaderboard_data = []
 
     for buddy in buddies:
-        recent_rounds = Round.objects.filter(user=buddy).order_by("-date_played")[:5]
+        recent_rounds = Round.objects.filter(user=buddy).order_by("-date")[:5]
 
         handicap = calculate_handicap(buddy)
 
@@ -117,7 +121,7 @@ def leaderboard_view(request):
                 "user": buddy,
                 "handicap": handicap if handicap is not None else "N/A",
                 # Ensure this matches your field name (the error says 'scores')
-                "recent_scores": [r.scores for r in recent_rounds],
+                "recent_scores": [r.total_score for r in recent_rounds],
                 "sort_val": handicap if handicap is not None else 99.9,
             }
         )
@@ -144,3 +148,33 @@ def add_round(request):
         form = RoundForm()
 
     return render(request, "scoring/add_round.html", {"form": form})
+
+
+def enter_scores(request, round_id):
+    round_obj = get_object_or_404(Round, pk=round_id)
+    # Get all holes for this course, but select the specific tee data
+    # This assumes your Hole model has a related TeeSet or a Yardage model
+    holes = Hole.objects.filter(course=round_obj.course).order_by("hole_number")
+
+    # Get yardage for the specific tee chosen for this round
+    # You might need to adjust this depending on if yardage is on the Hole or a separate model
+    for hole in holes:
+        # Fetch the specific yardage for the Round's tee_set
+        hole.current_yardage = hole.yardages.filter(tee_set=round_obj.tee_set).first()
+
+    if request.method == "POST":
+        formset = HoleScoreFormSet(request.POST, instance=round_obj)
+        if formset.is_valid():
+            formset.save()
+            return redirect("scoring:leaderboard")
+    else:
+        formset = HoleScoreFormSet(instance=round_obj)
+
+    # Zip them so they line up in the template
+    forms_with_holes = zip(formset, holes)
+
+    return render(
+        request,
+        "scoring/enter_scores.html",
+        {"forms_with_holes": forms_with_holes, "formset": formset, "round": round_obj},
+    )

@@ -70,25 +70,25 @@ restore:
 format:
 	@echo "----------------------------------------------------------------"
 	@echo "BUILD STATUS: Formatting with Ruff..."
-	@ruff format .
-	@ruff check --fix .
+	@$(BIN)/ruff format .
+	@$(BIN)/ruff check --fix .
 	@echo "BUILD STATUS: Formatting with djlint..."
-	@djlint . --reformat
+	@$(BIN)/djlint . --reformat
 	@echo "RESULT: Codebase formatted and auto-fixed."
-	@isort .
+	@$(BIN)/isort .
 	@echo "RESULT: Imports sorted with isort."
-	@black .
+	@$(BIN)/black .
 	@echo "RESULT: Codebase formatted with Black."
 	@echo "----------------------------------------------------------------"
 
 lint:
 	@echo "----------------------------------------------------------------"
 	@echo "BUILD STATUS: Linting with Ruff..."
-	@ruff check .
+	@$(BIN)/ruff check .
 	@echo "RESULT: Linting complete."
 	@echo "----------------------------------------------------------------"
 	@echo "BUILD STATUS: Linting with djlint..."
-	@djlint . --check
+	@$(BIN)/djlint . --check
 	@echo "RESULT: Linting complete."
 	@echo "----------------------------------------------------------------"
 

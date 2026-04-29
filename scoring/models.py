@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone
@@ -27,10 +29,15 @@ class TeeSet(models.Model):
 
 
 class Hole(models.Model):
-    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="holes")
+    tee_set = models.ForeignKey(
+        TeeSet, on_delete=models.CASCADE, related_name="holes", null=True, blank=True
+    )
     hole_number = models.IntegerField()
     par = models.IntegerField(default=4)
     yardage = models.IntegerField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.tee_set}, {self.hole_number}"
 
     class Meta:
         ordering = ["hole_number"]
@@ -39,53 +46,85 @@ class Hole(models.Model):
 class Round(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     course = models.ForeignKey("Course", on_delete=models.CASCADE)
-    # Add this line!
-    tee_set = models.ForeignKey("TeeSet", on_delete=models.SET_NULL, null=True)
-
-    date_played = models.DateField(default=timezone.now)
-    # Ensure this matches the 'scores' name in your Choice list
-    scores = models.IntegerField()
-    differential = models.DecimalField(max_digits=5, decimal_places=2, editable=False)
-
-    def save(self, *args, **kwargs):
-        # We need the Slope and Rating from the TeeSet to do the math.
-        # This assumes your Round model has a 'tee_set' foreign key.
-        if not self.differential:
-            # Formula: (Score - Rating) * 113 / Slope
-            # We use float() because Decimal and float don't always mix well in Python math
-            diff = (float(self.total_score) - float(self.tee_set.rating)) * (
-                113 / self.tee_set.slope
-            )
-            self.differential = diff
-        super().save(*args, **kwargs)
+    date = models.DateField(default=timezone.now)
+    total_gross_score = models.IntegerField(default=0)
+    completed_holes = models.IntegerField(default=18)
+    # We allow null=True here so the import can save before calculating the diff
+    differential = models.DecimalField(
+        max_digits=5, decimal_places=2, editable=False, null=True, blank=True
+    )
+    external_url = models.URLField(max_length=500, null=True, blank=True)
 
     @property
     def total_score(self):
-        return (
-            self.scores.aggregate(models.Sum("strokes"))["strokes__sum"]
-            if self.scores.exists()
-            else 0
-        )
+        # Use 'scores' because that is the related_name we set in the migration
+        if self.scores.exists():
+            return self.scores.aggregate(models.Sum("strokes"))[
+                "strokes__sum"
+            ] or Decimal("0.00")
+        return self.total_gross_score
 
-    @property
-    def total_par(self):
-        return (
-            self.scores.aggregate(models.Sum("hole__par"))["hole__par__sum"]
-            if self.scores.exists()
-            else 0
-        )
+    def update_differential(self):
+        all_scores = self.scores.all()
+        
+        # Scenario A: We have individual HoleScores
+        if all_scores.exists():
+            gross = Decimal(str(sum(s.strokes for s in all_scores)))
+            self.total_gross_score = int(gross)
+            tee = all_scores.first().hole.tee_set
+            
+        # Scenario B: No HoleScores (CSV Import Fallback)
+        else:
+            gross = Decimal(str(self.total_gross_score))
+            # Find the TeeSet associated with this course. 
+            # We use .first() as a safe default for historical data.
+            tee = self.course.tees.first() 
+
+        if not tee or gross == 0:
+            return None
+
+        try:
+            # Use full 18-hole ratings for both scenarios
+            rating = Decimal(str(tee.rating))
+            slope = Decimal(str(tee.slope))
+
+            if self.completed_holes == 9:
+                # 1. Double the score to see the 18-hole "pace"
+                # 2. Calculate the 18-hole differential
+                # 3. Divide by 2 to get the 9-hole value
+                full_diff = (Decimal("113") / slope) * ((gross * 2) - rating)
+                self.differential = full_diff / 2
+            else:
+                # Standard 18-hole calculation
+                self.differential = (Decimal("113") / slope) * (gross - rating)
+            
+            return self.differential
+        except Exception:
+            return None
+        
 
     def __str__(self):
-        return f"{self.user.username} at {self.course.name} ({self.date_played.date()})"
+        return f"{self.user.username} at {self.course.name} ({self.date})"
+
+    def save(self, *args, **kwargs):
+        # On updates (when the round already exists in the DB),
+        # we can try to recalculate the differential.
+        if self.pk:
+            self.update_differential()
+
+        # If it's a new round and differential is still null,
+        # default to 0.0 so the DB doesn't complain
+        if self.differential is None:
+            self.differential = Decimal("0.00")
+
+        super().save(*args, **kwargs)
 
 
 class HoleScore(models.Model):
-    round = models.ForeignKey(
-        Round, on_delete=models.CASCADE, related_name="hole_scores"
-    )
+    round = models.ForeignKey(Round, on_delete=models.CASCADE, related_name="scores")
     hole = models.ForeignKey(Hole, on_delete=models.CASCADE)
     strokes = models.IntegerField()
     putts = models.IntegerField(default=0)
 
     def __str__(self):
-        return f"Hole {self.hole.hole_number}: {self.strokes} strokes"
+        return f"{self.round.user.first_name} - Hole {self.hole.hole_number}: {self.strokes} strokes"
