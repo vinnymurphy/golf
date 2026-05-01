@@ -22,6 +22,8 @@ help:
 	@echo "  make lint     - run ruff check on the code base
 	@echo "  make check    - Safety Suite where we run format, test, backup
 	@echo "  make clean    - Remove __pycache__ and build artifacts"
+	@echo "  make handicap - Run the handicap fixing script to update all player handicaps based on their rounds"
+
 
 setup:
 	@echo "[INFO] Initializing Virtual Environment..."
@@ -37,6 +39,10 @@ migrate:
 run:
 	$(MANAGE) runserver
 
+handicap:
+	$(MANAGE) calculate_handicaps
+
+
 test:
 	$(MANAGE) test -v 2 jobs
 
@@ -46,6 +52,9 @@ shell:
 clean:
 	find . -name "*.pyc" -delete
 	find . -name "__pycache__" -delete
+
+handicap_fix:
+	$(MANAGE) 
 
 backup:
 	@mkdir -p $(BACKUP_DIR)
