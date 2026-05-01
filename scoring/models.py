@@ -66,19 +66,19 @@ class Round(models.Model):
 
     def update_differential(self):
         all_scores = self.scores.all()
-        
+
         # Scenario A: We have individual HoleScores
         if all_scores.exists():
             gross = Decimal(str(sum(s.strokes for s in all_scores)))
             self.total_gross_score = int(gross)
             tee = all_scores.first().hole.tee_set
-            
+
         # Scenario B: No HoleScores (CSV Import Fallback)
         else:
             gross = Decimal(str(self.total_gross_score))
-            # Find the TeeSet associated with this course. 
+            # Find the TeeSet associated with this course.
             # We use .first() as a safe default for historical data.
-            tee = self.course.tees.first() 
+            tee = self.course.tees.first()
 
         if not tee or gross == 0:
             return None
@@ -97,11 +97,10 @@ class Round(models.Model):
             else:
                 # Standard 18-hole calculation
                 self.differential = (Decimal("113") / slope) * (gross - rating)
-            
+
             return self.differential
         except Exception:
             return None
-        
 
     def __str__(self):
         return f"{self.user.username} at {self.course.name} ({self.date})"
