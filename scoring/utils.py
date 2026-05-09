@@ -39,7 +39,13 @@ def calculate_handicap(player_user):
     """Calculate a player's WHS-style handicap index from their recent rounds."""
 
     # 1. Get the 20 most recent rounds
-    all_rounds = Round.objects.filter(user=player_user).order_by("-date")[:20]
+
+    all_rounds = Round.objects.filter(user=player_user).order_by("-date")
+    for rnd in all_rounds:
+        rnd.differential = (
+            rnd.update_differential()
+        )  # Ensure differential is up to date
+        rnd.save(update_fields=["differential"])
 
     # 2. Filter out rounds where differential is None or 0.00
     valid_rounds = [
@@ -64,5 +70,8 @@ def calculate_handicap(player_user):
 
     best_diffs = diffs[:num_to_use]
     index = sum(best_diffs) / num_to_use
+    print(
+        f"Best {num_to_use} differentials for {player_user.username}: {best_diffs} -> Index: {index}"
+    )
 
     return round(index, 1)

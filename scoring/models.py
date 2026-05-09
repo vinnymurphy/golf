@@ -64,6 +64,17 @@ class Round(models.Model):
             ] or Decimal("0.00")
         return self.total_gross_score
 
+    @property
+    def total_par(self):
+        # Sum the par values for holes where we have scores
+        if self.scores.exists():
+            return sum(score.hole.par for score in self.scores.all())
+        # Fallback to the course's first tee set if no hole-by-score data exists
+        tee = self.course.tees.first()
+        if tee:
+            return sum(hole.par for hole in tee.holes.all())
+        return 0
+
     def update_differential(self):
         all_scores = self.scores.all()
 
