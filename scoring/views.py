@@ -24,14 +24,31 @@ def leaderboard(request):
 def round_detail(request, round_id):
     # Fetch the specific round or return a 404 error if it doesn't exist
     round_obj = get_object_or_404(Round, pk=round_id)
+    # Fetch hole scores ordered by hole number for the scorecard
+    hole_scores = round_obj.scores.all().order_by("hole__hole_number")
 
     # We pass the round object to a template
     context = {
         "round": round_obj,
+        "hole_scores": hole_scores,
         "total": round_obj.total_score,
         "relative_to_par": round_obj.total_score - round_obj.total_par,
     }
     return render(request, "scoring/round_detail.html", context)
+
+
+def player_profile(request, username):
+    # Fetch the player by username
+    player = get_object_or_404(User, username=username)
+    # Get all rounds for this player, most recent first
+    rounds = Round.objects.filter(user=player).order_by("-date")
+
+    context = {
+        "player": player,
+        "rounds": rounds,
+        "total_rounds": rounds.count(),
+    }
+    return render(request, "scoring/player_profile.html", context)
 
 
 def enter_scorecard(request, course_id):
