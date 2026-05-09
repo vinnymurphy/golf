@@ -1,14 +1,16 @@
 # JobSearch Project Automation
-VENV = venv
-BIN = $(VENV)/bin
-PYTHON = $(BIN)/python3
-MANAGE = $(PYTHON) manage.py
-BACKUP_DIR = backups
-TIMESTAMP = $(shell date +%F_%H%M%S)
+VENV       := venv
+BIN        := $(VENV)/bin
+PYTHON     := $(BIN)/python3
 
+BACKUP_DIR := backups
+DJLINT     := $(BIN)/djlint
+MANAGE     := $(PYTHON) manage.py
+PIP        := $(BIN)/pip
+RUFF       := $(BIN)/ruff
+TIMESTAMP  := $(shell date +%F_%H%M%S)
 
-.PHONY: help setup install migrate run test shell clean
-
+.PHONY: all backup clean format help install lint migrate restore run setup shell test
 help:
 	@echo "Available commands:"
 	@echo "  make setup    - Create venv and install dependencies"
@@ -28,8 +30,8 @@ help:
 setup:
 	@echo "[INFO] Initializing Virtual Environment..."
 	python3 -m venv $(VENV)
-	$(BIN)/pip install --upgrade pip
-	$(BIN)/pip install -r requirements.txt
+	$(PIP) install --upgrade pip
+	$(PIP) install -r requirements.txt
 	@echo "[SUCCESS] Environment ready. Run 'make migrate' next."
 
 migrate:
@@ -53,9 +55,6 @@ clean:
 	find . -name "*.pyc" -delete
 	find . -name "__pycache__" -delete
 
-handicap_fix:
-	$(MANAGE) 
-
 backup:
 	@mkdir -p $(BACKUP_DIR)
 	@echo "----------------------------------------------------------------"
@@ -72,17 +71,14 @@ restore:
 	@echo "RESULT: Database synchronized with $(shell ls -t $(BACKUP_DIR)/*.json | head -1)"
 	@echo "----------------------------------------------------------------"
 
-.PHONY: help install migrate run test shell clean backup restore format lint
-
-# ... (keep existing targets) ...
 
 format:
 	@echo "----------------------------------------------------------------"
-	@echo "BUILD STATUS: Formatting with Ruff..."
-	@$(BIN)/ruff format .
-	@$(BIN)/ruff check --fix .
-	@echo "BUILD STATUS: Formatting with djlint..."
-	@$(BIN)/djlint . --reformat
+	@echo "BUILD STATUS: Formatting with $(RUFF)..."
+	@$(RUFF) format .
+	@$(RUFF) check --fix .
+	@echo "BUILD STATUS: Formatting with $(DJLINT)..."
+	@$(DJLINT) . --reformat
 	@echo "RESULT: Codebase formatted and auto-fixed."
 	@$(BIN)/isort .
 	@echo "RESULT: Imports sorted with isort."
@@ -92,12 +88,12 @@ format:
 
 lint:
 	@echo "----------------------------------------------------------------"
-	@echo "BUILD STATUS: Linting with Ruff..."
-	@$(BIN)/ruff check .
+	@echo "BUILD STATUS: Linting with $(RUFF)..."
+	@$(RUFF) check .
 	@echo "RESULT: Linting complete."
 	@echo "----------------------------------------------------------------"
-	@echo "BUILD STATUS: Linting with djlint..."
-	@$(BIN)/djlint . --check
+	@echo "BUILD STATUS: Linting with $(DJLINT)..."
+	@$(DJLINT) . --check
 	@echo "RESULT: Linting complete."
 	@echo "----------------------------------------------------------------"
 
