@@ -1,10 +1,11 @@
-from decimal import Decimal
-
 from .models import Round
 
 
 def _num_differentials_to_use(count: int) -> int | None:
-    """Return number of differentials to use per WHS rules for a given round count."""
+    """Return number of differentials to use per WHS rules for a given
+    round count.
+    """
+    print(f"{count=}")
     if count < 3:
         return None
 
@@ -36,34 +37,21 @@ def _num_differentials_to_use(count: int) -> int | None:
 
 
 def calculate_handicap(player_user):
-    """Calculate a player's WHS-style handicap index from their recent rounds."""
-
-    # 1. Get the 20 most recent rounds
-
+    """Calculate a player's WHS-style handicap index from their recent
+    rounds.
+    """
     all_rounds = Round.objects.filter(user=player_user).order_by("-date")
-    for rnd in all_rounds:
-        rnd.differential = (
-            rnd.update_differential()
-        )  # Ensure differential is up to date
-        rnd.save(update_fields=["differential"])
-
-    # 2. Filter out rounds where differential is None or 0.00
-    valid_rounds = [
-        r
-        for r in all_rounds
-        if r.differential is not None and r.differential != Decimal("0.00")
+    bad_diffs = [
+        r.date for r in all_rounds if r.differential is None or r.differential <= 0
     ]
-
-    count = len(valid_rounds)
-    num_to_use = _num_differentials_to_use(count)
-
+    if bad_diffs:
+        print(f"Bad differentials found for {player_user.username}: {bad_diffs}")
+    num_to_use = _num_differentials_to_use(all_rounds.count())
     if num_to_use is None:
         return None
 
-    # 3. Get the differentials and sort them (lowest is best)
-    diffs = sorted(float(r.differential) for r in valid_rounds)
+    diffs = sorted(float(r.differential) for r in all_rounds)
 
-    # Ensure num_to_use doesn't exceed the number of available differentials
     num_to_use = min(num_to_use, len(diffs))
     if num_to_use == 0:
         return None

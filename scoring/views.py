@@ -124,29 +124,69 @@ def start_round(request):
     return render(request, "scoring/start_round.html", {"courses": courses})
 
 
-def leaderboard_view(request):
-    buddies = User.objects.all()
+def leaderboard_view(request, slug):
+    course = get_object_or_404(Course, slug=slug)
+
+    player_ids = (
+        Round.objects.filter(course=course).values_list("user", flat=True).distinct()
+    )
+    buddies = User.objects.filter(id__in=player_ids)
     leaderboard_data = []
-
+    course = get_object_or_404(Course, slug=slug)
     for buddy in buddies:
-        recent_rounds = Round.objects.filter(user=buddy).order_by("-date")[:5]
-
+        handicap = calculate_handicap(buddy)
+        recent_rounds = Round.objects.filter(user=buddy, course=course).order_by(
+            "-date"
+        )
         handicap = calculate_handicap(buddy)
 
         leaderboard_data.append(
             {
                 "user": buddy,
                 "handicap": handicap if handicap is not None else "N/A",
-                # Ensure this matches your field name (the error says 'scores')
                 "recent_scores": [r.total_score for r in recent_rounds],
                 "sort_val": handicap if handicap is not None else 99.9,
             }
         )
 
     leaderboard_data.sort(key=lambda x: x["sort_val"])
-    return render(
-        request, "scoring/leaderboard.html", {"leaderboard": leaderboard_data}
-    )
+    context = {
+        "leaderboard": leaderboard_data,
+        "course": course,
+        "all_courses": Course.objects.all(),
+    }
+    return render(request, "scoring/leaderboard.html", context)
+
+
+def global_leaderboard(request):
+    player_ids = Round.objects.values_list("user", flat=True).distinct()
+    buddies = User.objects.filter(id__in=player_ids)
+    leaderboard_data = []
+
+    for buddy in buddies:
+        # 1. Global Handicap Index (WHS)
+        handicap = calculate_handicap(buddy)
+
+        # 2. Most recent 5 rounds ANYWHERE
+        recent_rounds = Round.objects.filter(user=buddy).order_by("-date")[:5]
+
+        leaderboard_data.append(
+            {
+                "user": buddy,
+                "handicap": handicap if handicap is not None else "N/A",
+                "recent_scores": [r.total_score for r in recent_rounds],
+                "sort_val": handicap if handicap is not None else 99.9,
+            }
+        )
+
+    # Sort by the global handicap (lowest to highest)
+    leaderboard_data.sort(key=lambda x: x["sort_val"])
+
+    context = {
+        "leaderboard": leaderboard_data,
+        "all_courses": Course.objects.all(),
+    }
+    return render(request, "scoring/global_leaderboard.html", context)
 
 
 @login_required
@@ -193,5 +233,9 @@ def enter_scores(request, round_id):
     return render(
         request,
         "scoring/enter_scores.html",
-        {"forms_with_holes": forms_with_holes, "formset": formset, "round": round_obj},
+        {
+            "forms_with_holes": forms_with_holes,
+            "formset": formset,
+            "round": round_obj,
+        },
     )

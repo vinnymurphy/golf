@@ -35,7 +35,7 @@
                     </div>
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-success btn-lg">Next: Enter Hole Scores</button>
-                        <a href="{% url 'scoring:leaderboard' %}"
+                        <a href="{% url 'scoring:leaderboard' form.course.slug %}"
                            class="btn btn-outline-secondary">Cancel</a>
                     </div>
                 </form>

@@ -8,9 +8,15 @@ from django.utils import timezone
 class Course(models.Model):
     name = models.CharField(max_length=100)
     location = models.CharField(max_length=100, default="Marion, MA")
+    slug = models.SlugField(unique=True, blank=True)
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = self.name.lower().replace(" ", "-")
+        super().save(*args, **kwargs)
 
 
 class TeeSet(models.Model):
@@ -66,13 +72,17 @@ class Round(models.Model):
 
     @property
     def total_par(self):
-        # Sum the par values for holes where we have scores
+        # 1. If we have individual hole scores, use those (most accurate)
         if self.scores.exists():
             return sum(score.hole.par for score in self.scores.all())
-        # Fallback to the course's first tee set if no hole-by-score data exists
+
+        # 2. Fallback for summary-only imports (where total_par was showing 68)
         tee = self.course.tees.first()
         if tee:
-            return sum(hole.par for hole in tee.holes.all())
+            # Sort holes by number and slice based on completed_holes (e.g., 9)
+            holes = tee.holes.all().order_by("hole_number")[: self.completed_holes]
+            return sum(h.par for h in holes)
+
         return 0
 
     def update_differential(self):
