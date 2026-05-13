@@ -5,33 +5,45 @@
             <h2>Buddy Handicap Leaderboard</h2>
             <a href="{% url 'scoring:add_round' %}" class="btn btn-success">+ Post Round</a>
         </div>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>{{ course.name }} Leaderboard</h1>
+            <div class="dropdown">
+                <button class="btn btn-outline-dark dropdown-toggle"
+                        type="button"
+                        data-bs-toggle="dropdown">Change Course</button>
+                <ul class="dropdown-menu">
+                    {% for course in all_courses %}
+                        <li>
+                            <a class="dropdown-item"
+                               href="{% url 'scoring:leaderboard_detail' course.slug %}">{{ course.name }}</a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        <div class="alert alert-info">No scores posted for this course yet. Be the first to post a round!</div>
         <table class="table table-hover shadow-sm bg-white">
             <thead class="table-dark">
                 <tr>
-                    <th>Rank</th>
                     <th>Player</th>
-                    <th>Handicap Index</th>
-                    <th>Recent Scores</th>
-                    <th>Status</th>
+                    <th>Index</th>
+                    <th>Strokes  ({{ course.name }})</th>
+                    <th>Recent (at this course)</th>
                 </tr>
             </thead>
             <tbody>
                 {% for entry in leaderboard %}
                     <tr>
-                        <td>{{ forloop.counter }}</td>
                         <td>
-                            <strong>{{ entry.user.first_name }}</strong>
+                            <a href="{% url 'scoring:player_profile' entry.user.username %}"
+                               class="text-decoration-none">
+                                <strong>{{ entry.user.first_name }}</strong>
+                            </a>
                         </td>
                         <td>
                             <span class="badge bg-primary fs-6">{{ entry.handicap }}</span>
                         </td>
-                        <td>
-                            {% for score in entry.recent_scores %}
-                                <small class="text-muted">{{ score }}</small>
-                            {% empty %}
-                                <small class="text-muted">No rounds yet</small>
-                            {% endfor %}
-                        </td>
+                        <td>{{ entry.recent_scores|join:", " }}</td>
                         <td>
                             {% if entry.sort_val < 4 %}
                                 <span class="text-danger">🔥 Scratch Threat</span>
