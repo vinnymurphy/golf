@@ -43,7 +43,11 @@
                         <td>
                             <span class="badge bg-primary fs-6">{{ entry.handicap }}</span>
                         </td>
-                        <td>{{ entry.recent_scores|join:", " }}</td>
+                        <td>
+                            {% for item in entry.recent_scores %}
+                                <span class="badge bg-light text-dark border">{{ item }}</span>
+                            {% endfor %}
+                        </td>
                         <td>
                             {% if entry.sort_val < 4 %}
                                 <span class="text-danger">🔥 Scratch Threat</span>
