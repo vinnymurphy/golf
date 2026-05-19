@@ -15,6 +15,9 @@ class Course(models.Model):
     def __str__(self):
         return self.name
 
+    class Meta:
+        ordering = ["name"]
+
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.name)
@@ -31,6 +34,16 @@ class TeeSet(models.Model):
         max_digits=4, decimal_places=1, help_text="USGA Course Rating (e.g., 71.2)"
     )
     slope = models.IntegerField(help_text="USGA Slope Rating (usually 55-155)")
+
+    class Meta:
+        unique_together = ("course", "name")
+
+    def clean(self) -> None:
+        if self.slope < 55 or self.slope > 155:
+            raise ValidationError("Slope rating must be between 55 and 155")
+        if self.rating < 0 or self.rating > 80:
+            raise ValidationError("Course rating must be between 0.0 and 80.0")
+        return super().clean()
 
     def __str__(self):
         return f"{self.course.name} - {self.color} ({self.rating}/{self.slope})"
@@ -133,6 +146,13 @@ class Round(models.Model):
             print(f"Error calculating differential for round {self.id}: {e}")
             return None
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "-date"]),
+            models.Index(fields=["course", "-date"]),
+        ]
+        ordering = ["-date"]
+
     def __str__(self):
         return f"{self.user.username} at {self.course.name} ({self.date})"
 
@@ -156,5 +176,13 @@ class HoleScore(models.Model):
     strokes = models.IntegerField()
     putts = models.IntegerField(default=0)
 
+    def clean(self):
+        if self.strokes < 1:
+            raise ValidationError("Strokes must be at least 1")
+        if self.putts < 0:
+            raise ValidationError("Putts cannot be negative")
+        return super().clean()
+
     def __str__(self):
-        return f"{self.round.user.first_name} - Hole {self.hole.hole_number}: {self.strokes} strokes"
+        user_display = self.round.user.get_full_name() or self.round.user.username
+        return f"{user_display} - Hole {self.hole.hole_number}: {self.strokes} strokes"
