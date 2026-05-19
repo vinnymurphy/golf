@@ -13,11 +13,13 @@ class TeeSetInline(admin.TabularInline):
 class HoleInline(admin.TabularInline):
     model = Hole
     extra = 18  # Pre-populate 18 rows for convenience
+    fields = ("number", "handicap", "par")
 
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
     list_display = ("name", "location")
+    search_fields = ("name", "location")
     inlines = [TeeSetInline]
 
 
@@ -25,6 +27,7 @@ class CourseAdmin(admin.ModelAdmin):
 class TeeSetAdmin(admin.ModelAdmin):
     list_display = ("course", "color", "rating", "slope")
     list_filter = ("course", "color")
+    ordering = ("course", "color")
     inlines = [HoleInline]
 
 
@@ -33,8 +36,17 @@ class RoundAdmin(admin.ModelAdmin):
     # Make sure 'tee_set' is NOT in this list
     list_display = ("date", "course", "total_gross_score", "completed_holes")
     list_filter = ("course", "date")
+    readonly_fields = ("total_gross_score", "completed_holes)
+    date_hierarchy = "date"
 
+@admin.register(Hole)
+class HoleAdmin(admin.ModelAdmin):
+    list_display = ("tee_set", "number", "par", "handicap")
+    list_filter = ("tee_set__course", "par")
+    ordering = ("tee_set", "number")
 
-# Register the rest simply
-admin.site.register(Hole)
-admin.site.register(HoleScore)
+@admin.register(HoleScore)
+class HoleScoreAdmin(admin.ModelAdmin):
+    list_display = ("round", "hole", "gross_score")
+    list_filter = ("round__date", "round__course")
+    search_fields = ("round__course__name",)
