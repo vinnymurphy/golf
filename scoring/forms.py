@@ -148,7 +148,9 @@ class RoundForm(forms.ModelForm):
             "completed_holes": "Holes Completed",
         }
         widgets = {
-            "date": forms.DateTimeInput(attrs={**FORM_CONTROL_ATTRS, "type": "datetime-local"}),
+            "date": forms.DateTimeInput(
+                attrs={**FORM_CONTROL_ATTRS, "type": "datetime-local"}
+            ),
             "total_gross_score": forms.NumberInput(
                 attrs={**NUMBER_INPUT_ATTRS, "min": 1, "placeholder": "Total score"}
             ),
