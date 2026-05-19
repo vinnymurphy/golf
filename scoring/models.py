@@ -1,8 +1,10 @@
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+from django.utils.text import slugify
 
 
 class Course(models.Model):
@@ -15,7 +17,7 @@ class Course(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = self.name.lower().replace(" ", "-")
+            self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
 
@@ -31,7 +33,7 @@ class TeeSet(models.Model):
     slope = models.IntegerField(help_text="USGA Slope Rating (usually 55-155)")
 
     def __str__(self):
-        return f"{self.course.name} - {self.color}"
+        return f"{self.course.name} - {self.color} ({self.rating}/{self.slope})"
 
 
 class Hole(models.Model):
@@ -42,10 +44,17 @@ class Hole(models.Model):
     par = models.IntegerField(default=4)
     yardage = models.IntegerField(blank=True, null=True)
 
+    def clean(self):
+        if self.hole_number < 1 or self.hole_number > 18:
+            raise ValidationError("Hole number must be between 1 and 18")
+        if self.par < 3 or self.par > 5:
+            raise ValidationError("Par must be between 3 and 5")
+
     def __str__(self):
         return f"{self.tee_set}, {self.hole_number}"
 
     class Meta:
+        unique_together = ("tee_set", "hole_number")
         ordering = ["hole_number"]
 
 
@@ -74,12 +83,11 @@ class Round(models.Model):
     def total_par(self):
         # 1. If we have individual hole scores, use those (most accurate)
         if self.scores.exists():
-            return sum(score.hole.par for score in self.scores.all())
+            return self.scores.aggregate(models.Sum("hole__par"))[
+                "hole__par__sum"
+            ] or Decimal("0.00")
 
-        # 2. Fallback for summary-only imports (where total_par was showing 68)
-        tee = self.course.tees.first()
-        if tee:
-            # Sort holes by number and slice based on completed_holes (e.g., 9)
+        if tee := self.course.tees.first():
             holes = tee.holes.all().order_by("hole_number")[: self.completed_holes]
             return sum(h.par for h in holes)
 
@@ -108,19 +116,21 @@ class Round(models.Model):
             # Use full 18-hole ratings for both scenarios
             rating = Decimal(str(tee.rating))
             slope = Decimal(str(tee.slope))
+            USGA_HANDICAP_INDEX = Decimal("113")
 
             if self.completed_holes == 9:
                 # 1. Double the score to see the 18-hole "pace"
                 # 2. Calculate the 18-hole differential
                 # 3. Divide by 2 to get the 9-hole value
-                full_diff = (Decimal("113") / slope) * ((gross * 2) - rating)
+                full_diff = (USGA_HANDICAP_INDEX / slope) * ((gross * 2) - rating)
                 self.differential = full_diff / 2
             else:
                 # Standard 18-hole calculation
-                self.differential = (Decimal("113") / slope) * (gross - rating)
+                self.differential = (USGA_HANDICAP_INDEX / slope) * (gross - rating)
 
             return self.differential
-        except Exception:
+        except (ValueError, ZeroDivisionError) as e:
+            print(f"Error calculating differential for round {self.id}: {e}")
             return None
 
     def __str__(self):
