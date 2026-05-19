@@ -21,7 +21,6 @@
                 </ul>
             </div>
         </div>
-        <div class="alert alert-info">No scores posted for this course yet. Be the first to post a round!</div>
         <table class="table table-hover shadow-sm bg-white">
             <thead class="table-dark">
                 <tr>
@@ -44,9 +43,7 @@
                             <span class="badge bg-primary fs-6">{{ entry.handicap }}</span>
                         </td>
                         <td>
-                            {% for item in entry.recent_scores %}
-                                <span class="badge bg-light text-dark border">{{ item }}</span>
-                            {% endfor %}
+                            {% for item in entry.recent_scores %}<span class="badge bg-light text-dark border">{{ item }}</span>{% endfor %}
                         </td>
                         <td>
                             {% if entry.sort_val < 4 %}

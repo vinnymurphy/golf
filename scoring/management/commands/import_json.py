@@ -39,18 +39,28 @@ class Command(BaseCommand):
 
                 # 2. Add Hole Scores if they exist
                 if entry.get("hole_scores"):
+                    hole_scores = entry["hole_scores"]
                     tee_set = TeeSet.objects.get(
                         course=course, name=entry["tee_set_name"]
                     )
                     # We grab holes 1-9 specifically for your Rochester 9-hole data
                     holes = Hole.objects.filter(tee_set=tee_set).order_by(
                         "hole_number"
-                    )[: len(entry["hole_scores"])]
+                    )[: len(hole_scores)]
 
-                    for hole, score_val in zip(holes, entry["hole_scores"]):
+                    total_hole_score = sum(hole_scores)
+                    if total_hole_score != entry["total_gross_score"]:
+                        raise ValueError(
+                            f"Total gross score {entry['total_gross_score']} does not match sum of hole scores {total_hole_score}"
+                        )
+
+                    for hole, score_val in zip(holes, hole_scores):
                         HoleScore.objects.create(
                             round=new_round, hole=hole, strokes=score_val
                         )
+
+                # Update the differential for the round
+                new_round.calculate_differential()
 
                 self.stdout.write(
                     self.style.SUCCESS(f"Imported round for {entry['username']}")

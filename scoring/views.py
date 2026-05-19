@@ -173,18 +173,14 @@ def global_leaderboard(request):
         # --- THIS IS THE FIX ---
         # Map the Round objects into the format the template expects
         scores_list = [
-            {
-                "score": r.total_score, 
-                "course": r.course.name
-            } 
-            for r in recent_rounds
+            {"score": r.total_score, "course": r.course.name} for r in recent_rounds
         ]
 
         leaderboard_data.append(
             {
                 "user": buddy,
                 "handicap": handicap if handicap is not None else "N/A",
-                "recent_scores": scores_list, # Now contains dictionaries with 'score' and 'course'
+                "recent_scores": scores_list,  # Now contains dictionaries with 'score' and 'course'
                 "sort_val": handicap if handicap is not None else 99.9,
             }
         )
