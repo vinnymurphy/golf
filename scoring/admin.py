@@ -36,14 +36,16 @@ class RoundAdmin(admin.ModelAdmin):
     # Make sure 'tee_set' is NOT in this list
     list_display = ("date", "course", "total_gross_score", "completed_holes")
     list_filter = ("course", "date")
-    readonly_fields = ("total_gross_score", "completed_holes)
+    readonly_fields = ("total_gross_score", "completed_holes")
     date_hierarchy = "date"
+
 
 @admin.register(Hole)
 class HoleAdmin(admin.ModelAdmin):
     list_display = ("tee_set", "number", "par", "handicap")
     list_filter = ("tee_set__course", "par")
     ordering = ("tee_set", "number")
+
 
 @admin.register(HoleScore)
 class HoleScoreAdmin(admin.ModelAdmin):
