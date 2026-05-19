@@ -1,8 +1,10 @@
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+from django.utils.text import slugify
 
 
 class Course(models.Model):
@@ -13,9 +15,12 @@ class Course(models.Model):
     def __str__(self):
         return self.name
 
+    class Meta:
+        ordering = ["name"]
+
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = self.name.lower().replace(" ", "-")
+            self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
 
@@ -30,8 +35,18 @@ class TeeSet(models.Model):
     )
     slope = models.IntegerField(help_text="USGA Slope Rating (usually 55-155)")
 
+    class Meta:
+        unique_together = ("course", "name")
+
+    def clean(self) -> None:
+        if self.slope < 55 or self.slope > 155:
+            raise ValidationError("Slope rating must be between 55 and 155")
+        if self.rating < 0 or self.rating > 80:
+            raise ValidationError("Course rating must be between 0.0 and 80.0")
+        return super().clean()
+
     def __str__(self):
-        return f"{self.course.name} - {self.color}"
+        return f"{self.course.name} - {self.color} ({self.rating}/{self.slope})"
 
 
 class Hole(models.Model):
@@ -42,10 +57,17 @@ class Hole(models.Model):
     par = models.IntegerField(default=4)
     yardage = models.IntegerField(blank=True, null=True)
 
+    def clean(self):
+        if self.hole_number < 1 or self.hole_number > 18:
+            raise ValidationError("Hole number must be between 1 and 18")
+        if self.par < 3 or self.par > 5:
+            raise ValidationError("Par must be between 3 and 5")
+
     def __str__(self):
         return f"{self.tee_set}, {self.hole_number}"
 
     class Meta:
+        unique_together = ("tee_set", "hole_number")
         ordering = ["hole_number"]
 
 
@@ -74,12 +96,11 @@ class Round(models.Model):
     def total_par(self):
         # 1. If we have individual hole scores, use those (most accurate)
         if self.scores.exists():
-            return sum(score.hole.par for score in self.scores.all())
+            return self.scores.aggregate(models.Sum("hole__par"))[
+                "hole__par__sum"
+            ] or Decimal("0.00")
 
-        # 2. Fallback for summary-only imports (where total_par was showing 68)
-        tee = self.course.tees.first()
-        if tee:
-            # Sort holes by number and slice based on completed_holes (e.g., 9)
+        if tee := self.course.tees.first():
             holes = tee.holes.all().order_by("hole_number")[: self.completed_holes]
             return sum(h.par for h in holes)
 
@@ -108,20 +129,29 @@ class Round(models.Model):
             # Use full 18-hole ratings for both scenarios
             rating = Decimal(str(tee.rating))
             slope = Decimal(str(tee.slope))
+            USGA_HANDICAP_INDEX = Decimal("113")
 
             if self.completed_holes == 9:
                 # 1. Double the score to see the 18-hole "pace"
                 # 2. Calculate the 18-hole differential
                 # 3. Divide by 2 to get the 9-hole value
-                full_diff = (Decimal("113") / slope) * ((gross * 2) - rating)
+                full_diff = (USGA_HANDICAP_INDEX / slope) * ((gross * 2) - rating)
                 self.differential = full_diff / 2
             else:
                 # Standard 18-hole calculation
-                self.differential = (Decimal("113") / slope) * (gross - rating)
+                self.differential = (USGA_HANDICAP_INDEX / slope) * (gross - rating)
 
             return self.differential
-        except Exception:
+        except (ValueError, ZeroDivisionError) as e:
+            print(f"Error calculating differential for round {self.id}: {e}")
             return None
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "-date"]),
+            models.Index(fields=["course", "-date"]),
+        ]
+        ordering = ["-date"]
 
     def __str__(self):
         return f"{self.user.username} at {self.course.name} ({self.date})"
@@ -146,5 +176,13 @@ class HoleScore(models.Model):
     strokes = models.IntegerField()
     putts = models.IntegerField(default=0)
 
+    def clean(self):
+        if self.strokes < 1:
+            raise ValidationError("Strokes must be at least 1")
+        if self.putts < 0:
+            raise ValidationError("Putts cannot be negative")
+        return super().clean()
+
     def __str__(self):
-        return f"{self.round.user.first_name} - Hole {self.hole.hole_number}: {self.strokes} strokes"
+        user_display = self.round.user.get_full_name() or self.round.user.username
+        return f"{user_display} - Hole {self.hole.hole_number}: {self.strokes} strokes"
