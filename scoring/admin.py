@@ -40,15 +40,22 @@ class RoundAdmin(admin.ModelAdmin):
     date_hierarchy = "date"
 
 
+# scoring/admin.py
+
+
 @admin.register(Hole)
 class HoleAdmin(admin.ModelAdmin):
-    list_display = ("tee_set", "number", "par", "handicap")
+    list_display = (
+        "tee_set",
+        "hole_number",
+        "par",
+    )
+    ordering = ("tee_set", "hole_number")
     list_filter = ("tee_set__course", "par")
-    ordering = ("tee_set", "number")
 
 
 @admin.register(HoleScore)
 class HoleScoreAdmin(admin.ModelAdmin):
-    list_display = ("round", "hole", "gross_score")
+    list_display = ("round", "hole", "strokes")
     list_filter = ("round__date", "round__course")
     search_fields = ("round__course__name",)
