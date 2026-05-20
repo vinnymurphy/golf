@@ -8,6 +8,7 @@ app_name = "scoring"
 # scoring/urls.py
 
 urlpatterns = [
+    path("", views.RoundListView.as_view(), name="round_list"),
     path("add/", views.add_round, name="add_round"),
     path("round/<int:round_id>/", views.round_detail, name="round_detail"),
     path("leaderboard/", views.global_leaderboard, name="global_leaderboard"),
