@@ -41,16 +41,25 @@ class BaseHoleScoreFormSet(forms.BaseInlineFormSet):
                     )
 
 
+class HoleScoreForm(forms.ModelForm):
+    class Meta:
+        model = HoleScore
+        fields = ["strokes", "putts"]
+        labels = {
+            "strokes": "Strokes",
+            "putts": "Putts",
+        }
+
+
 HoleScoreFormSet = inlineformset_factory(
     Round,
     HoleScore,
-    form=lambda: HoleScoreForm(),
+    form=HoleScoreForm,
     formset=BaseHoleScoreFormSet,
-    fields=["strokes", "putts"],
-    extra=18,  # Pre-fills 18 holes
-    can_delete=False,  # Prevents accidental deletion of holes during entry
+    fields=("strokes", "putts"),
+    extra=18,
+    can_delete=False,
 )
-
 
 # ============================================================================
 # Forms
