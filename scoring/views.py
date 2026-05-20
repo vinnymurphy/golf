@@ -26,7 +26,8 @@ class RoundListView(ListView):
     model = Round
     template_name = "scoring/round_list.html"
     context_object_name = "rounds"
-    ordering = ["-date"] 
+    ordering = ["-date"]
+
 
 def round_detail(request, round_id):
     # Fetch the specific round or return a 404 error if it doesn't exist

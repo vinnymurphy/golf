@@ -1,56 +1,53 @@
 {% extends "base.html" %}
-
 {% block content %}
-<div class="container mt-4">
-    <!-- Header with Action Button -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Golf Rounds History</h2>
-        <a href="{% url 'scoring:add_round' %}" class="btn btn-primary">
-            <i class="bi bi-plus-lg"></i> Post New Score
-        </a>
-    </div>
-    {% if rounds %}
-        <div class="card shadow-sm">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Date Played</th>
-                            <th>Course</th>
-                            <th>Tee Set</th>
-                            <th class="text-center">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for round in rounds %}
+    <div class="container mt-4">
+        <!-- Header with Action Button -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Golf Rounds History</h2>
+            <a href="{% url 'scoring:add_round' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Post New Score
+            </a>
+        </div>
+        {% if rounds %}
+            <div class="card shadow-sm">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-dark">
                             <tr>
-                                <td><strong>{{ round.date|date:"M d, Y" }}</strong></td>
-                                <td>{{ round.course.name }}</td>
-                                <td>
-                                    <span class="badge bg-secondary">
-                                        {{ round.tee_set.name }}
-                                    </span>
-                                </td>
-                                <td class="text-center">
-                                    <!-- Placeholder links for detail/edit if you add them later -->
-                                    <a href="#" class="btn btn-sm btn-outline-dark me-1">View Details</a>
-                                </td>
+                                <th>Date Played</th>
+                                <th>Course</th>
+                                <th>Tee Set</th>
+                                <th class="text-center">Actions</th>
                             </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {% for round in rounds %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ round.date|date:"M d, Y" }}</strong>
+                                    </td>
+                                    <td>{{ round.course.name }}</td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ round.tee_set.name }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <!-- Placeholder links for detail/edit if you add them later -->
+                                        <a href="#" class="btn btn-sm btn-outline-dark me-1">View Details</a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
-    {% else %}
-        <div class="card text-center p-5 border-dashed">
-            <div class="card-body">
-                <h4 class="text-muted">No rounds recorded yet</h4>
-                <p class="text-muted mb-4">Get out on the course and post your first scorecard!</p>
-                <a href="{% url 'scoring:add_round' %}" class="btn btn-success">
-                    Record First Round
-                </a>
+        {% else %}
+            <div class="card text-center p-5 border-dashed">
+                <div class="card-body">
+                    <h4 class="text-muted">No rounds recorded yet</h4>
+                    <p class="text-muted mb-4">Get out on the course and post your first scorecard!</p>
+                    <a href="{% url 'scoring:add_round' %}" class="btn btn-success">Record First Round</a>
+                </div>
             </div>
-        </div>
-    {% endif %}
-</div>
+        {% endif %}
+    </div>
 {% endblock %}

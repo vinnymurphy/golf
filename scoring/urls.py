@@ -12,7 +12,6 @@ urlpatterns = [
     path("add/", views.add_round, name="add_round"),
     path("round/<int:round_id>/", views.round_detail, name="round_detail"),
     path("leaderboard/", views.global_leaderboard, name="global_leaderboard"),
-    # ENSURE THIS NAME MATCHES
     path("leaderboard/<slug:slug>/", views.leaderboard_view, name="leaderboard_detail"),
     path(
         "enter-scorecard/<int:course_id>/",
