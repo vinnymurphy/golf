@@ -36,6 +36,7 @@ LOGOUT_REDIRECT_URL = "login"
 
 INSTALLED_APPS = [
     "debug_toolbar",
+    "widget_tweaks",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",

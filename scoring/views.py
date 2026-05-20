@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.forms import inlineformset_factory
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.generic import ListView
 
 from .forms import RoundForm
 from .models import Course, Hole, HoleScore, Round, TeeSet
@@ -19,6 +20,13 @@ def index(request):
 
 def leaderboard(request):
     return HttpResponse("Global Golf Leaderboard")
+
+
+class RoundListView(ListView):
+    model = Round
+    template_name = "scoring/round_list.html"
+    context_object_name = "rounds"
+    ordering = ["-date"]
 
 
 def round_detail(request, round_id):
