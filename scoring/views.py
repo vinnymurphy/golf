@@ -30,9 +30,11 @@ def round_detail(request, round_id):
     # Fetch the specific round or return a 404 error if it doesn't exist
     round_obj = get_object_or_404(Round, pk=round_id)
     # Fetch hole scores ordered by hole number for the scorecard
-    hole_scores = round_obj.scores.all().order_by("hole__hole_number")
-
-    # We pass the round object to a template
+    hole_scores = (
+        round_obj.scores.all()
+        .select_related("hole")
+        .order_by("hole__hole_number")
+    )
     context = {
         "round": round_obj,
         "hole_scores": hole_scores,
@@ -167,9 +169,7 @@ def leaderboard_view(request, slug):
     course = get_object_or_404(Course, slug=slug)
     player_ids = (
         Round.objects.filter(course=course)
-        .values_list("user", flat=True)
-        .distinct(slug)
-        .values_list("user", flat=True)
+        .values_list("user_id", flat=True)
         .distinct()
     )
     buddies = User.objects.filter(id__in=player_ids)
