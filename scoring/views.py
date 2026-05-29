@@ -1,5 +1,6 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.db.models import Avg, Min
 from django.forms import inlineformset_factory
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -42,15 +43,48 @@ def round_detail(request, round_id):
 
 
 def player_profile(request, username):
-    # Fetch the player by username
     player = get_object_or_404(User, username=username)
-    # Get all rounds for this player, most recent first
-    rounds = Round.objects.filter(user=player).order_by("-date")
+
+    all_user_rounds = Round.objects.filter(user=player)
+
+    # 1. Calculate WHS Handicap Index
+    handicap_index, counting_ids = calculate_handicap(player)
+
+    # 2. Get Advanced Aggregations (Low Round, Average Score, Best Differential)
+    stats = all_user_rounds.aggregate(
+        low_score=Min("total_gross_score"),
+        avg_score=Avg("total_gross_score"),
+        best_diff=Min("differential"),
+    )
+
+    # 3. Calculate Form Trend (Average of last 3 rounds vs. overall handicap)
+    recent_3_rounds = all_user_rounds.order_by("-date")[:3]
+    if recent_3_rounds.count() >= 3:
+        recent_3_avg = (
+            sum(
+                float(r.differential)
+                for r in recent_3_rounds
+                if r.differential is not None
+            )
+            / 3
+        )
+        if handicap_index != "N/A":
+            trend_metric = round(recent_3_avg - float(handicap_index), 1)
+        else:
+            trend_metric = 0.0
+    else:
+        trend_metric = None
 
     context = {
         "player": player,
-        "rounds": rounds,
-        "total_rounds": rounds.count(),
+        "rounds": all_user_rounds.order_by("-date"),
+        "total_rounds": all_user_rounds.count(),
+        "handicap_index": handicap_index,
+        "counting_ids": counting_ids,
+        "low_score": stats["low_score"],
+        "avg_score": round(stats["avg_score"], 1) if stats["avg_score"] else None,
+        "best_diff": stats["best_diff"],
+        "trend_metric": trend_metric,
     }
     return render(request, "scoring/player_profile.html", context)
 
@@ -141,13 +175,13 @@ def leaderboard_view(request, slug):
     buddies = User.objects.filter(id__in=player_ids)
     leaderboard_data = []
     for buddy in buddies:
-        handicap = calculate_handicap(buddy)
+        handicap, _ = calculate_handicap(buddy)
         recent_rounds = (
             Round.objects.filter(user=buddy, course=course)
             .select_related("course")
             .order_by("-date")
         )
-        handicap = calculate_handicap(buddy)
+        handicap, _ = calculate_handicap(buddy)
 
         leaderboard_data.append(
             {
@@ -158,7 +192,9 @@ def leaderboard_view(request, slug):
             }
         )
 
-    leaderboard_data.sort(key=lambda x: x["sort_val"])
+    leaderboard_data.sort(
+        key=lambda x: float(x["handicap"]) if x["handicap"] != "N/A" else 999.0
+    )
     context = {
         "leaderboard": leaderboard_data,
         "course": course,
@@ -174,7 +210,7 @@ def global_leaderboard(request):
 
     for buddy in buddies:
         # 1. Global Handicap Index (WHS)
-        handicap = calculate_handicap(buddy)
+        handicap, _ = calculate_handicap(buddy)
 
         # 2. Most recent 5 rounds ANYWHERE
         recent_rounds = Round.objects.filter(user=buddy).order_by("-date")[:5]
@@ -195,7 +231,9 @@ def global_leaderboard(request):
         )
 
     # Sort by the global handicap (lowest to highest)
-    leaderboard_data.sort(key=lambda x: x["sort_val"])
+    leaderboard_data.sort(
+        key=lambda x: float(x["handicap"]) if x["handicap"] != "N/A" else 999.0
+    )
 
     context = {
         "leaderboard": leaderboard_data,
