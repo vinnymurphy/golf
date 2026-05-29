@@ -108,12 +108,12 @@ class Command(BaseCommand):
         username = entry["username"].lower()
 
         # Get or validate user
-        try:
-            user = User.objects.get(username=username)
-        except User.DoesNotExist as e:
-            raise ValueError(f"User '{username}' not found in database") from e
-
-        # Get or validate course
+        user, created = User.objects.get_or_create(
+            username=username, defaults={"is_active": True}
+        )
+        if created:
+            if verbose:
+                print(f"Created new user: {username}")
         try:
             course = Course.objects.get(name=entry["course"])
         except Course.DoesNotExist as exc:
