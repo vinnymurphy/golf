@@ -5,7 +5,6 @@ def _num_differentials_to_use(count: int) -> int | None:
     """Return number of differentials to use per WHS rules for a given
     round count.
     """
-    print(f"{count=}")
     if count < 3:
         return None
 
@@ -58,8 +57,5 @@ def calculate_handicap(player_user):
 
     best_diffs = diffs[:num_to_use]
     index = sum(best_diffs) / num_to_use
-    print(
-        f"Best {num_to_use} differentials for {player_user.username}: {best_diffs} -> Index: {index}"
-    )
 
     return round(index, 1)

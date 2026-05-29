@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from decimal import Decimal
 
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
@@ -89,8 +90,7 @@ class Command(BaseCommand):
             "total_gross_score",
             "completed_holes",
         ]
-        missing = [f for f in required_fields if f not in entry]
-        if missing:
+        if missing := [f for f in required_fields if f not in entry]:
             raise ValueError(f"Missing required fields: {', '.join(missing)}")
 
         # Validate hole_scores if provided
@@ -114,11 +114,12 @@ class Command(BaseCommand):
         if created:
             if verbose:
                 print(f"Created new user: {username}")
-
         try:
             course = Course.objects.get(name=entry["course"])
-        except Course.DoesNotExist:
-            raise ValueError(f"Course '{entry['course']}' not found in database")
+        except Course.DoesNotExist as exc:
+            raise ValueError(
+                f"Course '{entry['course']}' not found in database"
+            ) from exc
 
         # Create the Round
         new_round = Round.objects.create(
@@ -136,8 +137,8 @@ class Command(BaseCommand):
         if entry.get("hole_scores"):
             self._import_hole_scores(new_round, entry, verbose)
 
-        # Update the differential for the round
-        new_round.calculate_differential()
+        if new_round.differential is None or new_round.differential == Decimal("0.00"):
+            new_round.update_differential()
 
     def _import_hole_scores(self, round_obj, entry, verbose=False):
         """Import hole scores for a round."""
@@ -147,10 +148,10 @@ class Command(BaseCommand):
             tee_set = TeeSet.objects.get(
                 course=round_obj.course, name=entry["tee_set_name"]
             )
-        except TeeSet.DoesNotExist:
+        except TeeSet.DoesNotExist as e:
             raise ValueError(
                 f"Tee set '{entry['tee_set_name']}' not found for course '{round_obj.course.name}'"
-            )
+            ) from e
 
         # Fetch holes in order
         holes = list(
