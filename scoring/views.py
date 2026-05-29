@@ -5,13 +5,9 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import ListView
 
-from .forms import RoundForm
+from .forms import HoleScoreFormSet, RoundForm
 from .models import Course, Hole, HoleScore, Round, TeeSet
 from .utils import calculate_handicap
-
-HoleScoreFormSet = inlineformset_factory(
-    Round, HoleScore, fields=["strokes", "putts"], extra=18
-)
 
 
 def index(request):
@@ -59,6 +55,7 @@ def player_profile(request, username):
     return render(request, "scoring/player_profile.html", context)
 
 
+@login_required
 def enter_scorecard(request, course_id):
     course = get_object_or_404(Course, pk=course_id)
     # This creates a formset linked specifically between Round and HoleScore
@@ -134,17 +131,21 @@ def start_round(request):
 
 def leaderboard_view(request, slug):
     course = get_object_or_404(Course, slug=slug)
-
     player_ids = (
-        Round.objects.filter(course=course).values_list("user", flat=True).distinct()
+        Round.objects.filter(course=course)
+        .values_list("user", flat=True)
+        .distinct(slug)
+        .values_list("user", flat=True)
+        .distinct()
     )
     buddies = User.objects.filter(id__in=player_ids)
     leaderboard_data = []
-    course = get_object_or_404(Course, slug=slug)
     for buddy in buddies:
         handicap = calculate_handicap(buddy)
-        recent_rounds = Round.objects.filter(user=buddy, course=course).order_by(
-            "-date"
+        recent_rounds = (
+            Round.objects.filter(user=buddy, course=course)
+            .select_related("course")
+            .order_by("-date")
         )
         handicap = calculate_handicap(buddy)
 
@@ -221,10 +222,9 @@ def add_round(request):
     return render(request, "scoring/add_round.html", {"form": form})
 
 
+@login_required
 def enter_scores(request, round_id):
-    round_obj = get_object_or_404(Round, pk=round_id)
-    # Get all holes for this course, but select the specific tee data
-    # This assumes your Hole model has a related TeeSet or a Yardage model
+    round_obj = get_object_or_404(Round, pk=round_id, user=request.user)
     holes = Hole.objects.filter(course=round_obj.course).order_by("hole_number")
 
     # Get yardage for the specific tee chosen for this round
