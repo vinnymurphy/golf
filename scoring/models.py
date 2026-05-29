@@ -150,6 +150,7 @@ class Round(models.Model):
         indexes = [
             models.Index(fields=["user", "-date"]),
             models.Index(fields=["course", "-date"]),
+            models.Index(fields=["user", "course", "-date"]),
         ]
         ordering = ["-date"]
 
