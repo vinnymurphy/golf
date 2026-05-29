@@ -1,51 +1,112 @@
 {% extends "base.html" %}
 {% block content %}
     <div class="container mt-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1>{{ player.username| capfirst }}'s Golf Profile</h1>
-            <span class="badge bg-primary fs-5">{{ total_rounds }} Rounds Played</span>
-        </div>
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-dark text-white">
-                <h5 class="mb-0">Round History</h5>
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+            <div>
+                <h1 class="mb-0">{{ player.first_name|default:player.username|capfirst }}'s Golf Profile</h1>
+                <small class="text-muted">Member since {{ player.date_joined|date:"Y" }}</small>
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Date</th>
-                                <th>Course</th>
-                                <th class="text-center">Score</th>
-                                <th class="text-center">Par</th>
-                                <th class="text-center">Differential</th>
-                                <th class="text-end pe-4">Details</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for round in rounds %}
-                                <tr>
-                                    <td>{{ round.date }}</td>
-                                    <td>{{ round.course.name }}</td>
-                                    <td class="text-center fw-bold">{{ round.total_score }}</td>
-                                    <td class="text-center text-muted">{{ round.total_par }}</td>
-                                    <td class="text-center">{{ round.differential|default:"—" }}</td>
-                                    <td class="text-end pe-4">
-                                        <a href="{% url 'scoring:round_detail' round.id %}"
-                                           class="btn btn-sm btn-outline-primary">View Scorecard</a>
-                                    </td>
-                                </tr>
-                            {% empty %}
-                                <tr>
-                                    <td colspan="6" class="text-center py-4 text-muted">No rounds recorded yet for this player.</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+            <span class="badge bg-primary fs-5 shadow-sm">{{ total_rounds }} Rounds Played</span>
+        </div>
+        <div class="row mb-4">
+            <div class="col-md-4 mb-3">
+                <div class="card bg-dark text-white text-center p-4 shadow-sm h-100">
+                    <h6 class="text-uppercase text-muted small mb-1">WHS Handicap Index</h6>
+                    <h1 class="display-3 fw-bold my-2 text-success">{{ handicap_index }}</h1>
+                    {% if trend_metric is not None %}
+                        {% if trend_metric < 0 %}
+                            <span class="text-success small fw-bold">
+                                <i class="bi bi-graph-down-arrow"></i> 🔥 Trending Down ({{ trend_metric }})
+                            </span>
+                        {% elif trend_metric > 1.5 %}
+                            <span class="text-warning small fw-bold">
+                                <i class="bi bi-graph-up-arrow"></i> Trending Up (+{{ trend_metric }})
+                            </span>
+                        {% else %}
+                            <span class="text-muted small">
+                                <i class="bi bi-dash-lg"></i> Holding Steady
+                            </span>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-8 mb-3">
+                <div class="card p-4 shadow-sm h-100">
+                    <h5 class="card-title mb-4 fw-bold text-secondary">
+                        <i class="bi bi-trophy-fill text-warning"></i> Personal Records & Averages
+                    </h5>
+                    <div class="row text-center">
+                        <div class="col-4 border-end">
+                            <h3 class="fw-bold mb-0 text-dark">{{ low_score|default:"--" }}</h3>
+                            <small class="text-muted uppercase text-xs">Lowest Gross Score</small>
+                        </div>
+                        <div class="col-4 border-end">
+                            <h3 class="fw-bold mb-0 text-primary">{{ best_diff|stringformat:".1f"|default:"--" }}</h3>
+                            <small class="text-muted uppercase text-xs">Best Differential</small>
+                        </div>
+                        <div class="col-4">
+                            <h3 class="fw-bold mb-0 text-secondary">{{ avg_score|default:"--" }}</h3>
+                            <small class="text-muted uppercase text-xs">Scoring Average</small>
+                        </div>
+                    </div>
+                    <div class="alert alert-light border mt-4 mb-0 py-2 px-3 align-items-center d-flex">
+                        <i class="bi bi-info-circle-fill text-primary me-2"></i>
+                        <span class="small text-muted">
+                            Green highlighted table rows below represent the scores counting toward the current Handicap calculation.
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>
-        <a href="{% url 'scoring:global_leaderboard' %}"
-           class="btn btn-secondary">Back to Leaderboard</a>
+        <div class="row">
+            <div class="col-lg-10 col-md-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-dark text-white py-3">
+                        <h5 class="mb-0 fw-bold">
+                            <i class="bi bi-calendar3 me-2"></i> Scoring History Log
+                        </h5>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date Played</th>
+                                    <th>Course Name</th>
+                                    <th class="text-center">Score</th>
+                                    <th class="text-center">Par</th>
+                                    <th class="text-center">Differential</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for round in rounds %}
+                                    <tr class="{% if round.id in counting_ids %}table-success border-success-subtle fw-medium{% endif %}">
+                                        <td>{{ round.date|date:"M d, Y" }}</td>
+                                        <td>
+                                            {{ round.course.name }}
+                                            {% if round.id in counting_ids %}<span class="badge bg-success ms-1 bg-opacity-75 small">Counting</span>{% endif %}
+                                        </td>
+                                        <td class="text-center fw-bold">{{ round.total_gross_score }}</td>
+                                        <td class="text-center text-muted">{{ round.total_par|default:"34" }}</td>
+                                        <td class="text-center">{{ round.differential }}</td>
+                                        <td class="text-end">
+                                            <a href="{% url 'scoring:round_detail' round.id %}"
+                                               class="btn btn-sm btn-outline-dark">Details</a>
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="6" class="text-center py-5 text-muted">
+                                            <i class="bi bi-emoji-frown display-6 d-block mb-3"></i>
+                                            No rounds found for this profile yet.
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 {% endblock %}

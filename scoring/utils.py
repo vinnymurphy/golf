@@ -1,61 +1,67 @@
+from django.contrib.auth.models import User
+
 from .models import Round
 
 
-def _num_differentials_to_use(count: int) -> int | None:
-    """Return number of differentials to use per WHS rules for a given
-    round count.
+def _num_differentials_to_use(count: int) -> tuple[int, float] | None:
     """
-    if count < 3:
-        return None
-
-    # Mapping from number of rounds to number of differentials to use
-    mapping = {
-        3: 1,
-        4: 1,
-        5: 1,
-        6: 2,
-        7: 2,
-        8: 3,
-        9: 3,
-        10: 3,
-        11: 4,
-        12: 4,
-        13: 5,
-        14: 5,
-        15: 6,
-        16: 6,
-        17: 7,
-        18: 7,
+    Returns a tuple of (number_of_differentials_to_use, adjustment_modifier)
+    per official WHS rules based on total valid rounds played.
+    """
+    # WHS Sliding Scale: Map total_rounds -> (num_to_use, adjustment)
+    whs_table = {
+        3: (1, -2.0),
+        4: (1, -1.0),
+        5: (1, 0.0),
+        6: (2, -1.0),
+        7: (2, 0.0),
+        8: (2, 0.0),
+        9: (3, 0.0),
+        10: (3, 0.0),
+        11: (3, 0.0),
+        12: (4, 0.0),
+        13: (4, 0.0),
+        14: (4, 0.0),
+        15: (5, 0.0),
+        16: (5, 0.0),
+        17: (6, 0.0),
+        18: (7, 0.0),
+        19: (7, 0.0),
+        20: (8, 0.0),
     }
-
-    if count in mapping:
-        return mapping[count]
-
-    # 19 and 20+ use 8 differentials
-    return 8 if count >= 19 else None
+    return None if count < 3 else whs_table.get(count, (8, 0.0))
 
 
-def calculate_handicap(player_user):
-    """Calculate a player's WHS-style handicap index from their recent
-    rounds.
-    """
-    all_rounds = Round.objects.filter(user=player_user).order_by("-date")
-    bad_diffs = [
-        r.date for r in all_rounds if r.differential is None or r.differential <= 0
-    ]
-    if bad_diffs:
-        print(f"Bad differentials found for {player_user.username}: {bad_diffs}")
-    num_to_use = _num_differentials_to_use(all_rounds.count())
-    if num_to_use is None:
-        return None
+# scoring/utils.py
 
-    diffs = sorted(float(r.differential) for r in all_rounds)
 
-    num_to_use = min(num_to_use, len(diffs))
-    if num_to_use == 0:
-        return None
+def calculate_handicap(player_input):
+    if isinstance(player_input, User):
+        all_rounds = Round.objects.filter(user=player_input).order_by("-date")
+    else:
+        all_rounds = player_input.order_by("-date")
 
-    best_diffs = diffs[:num_to_use]
-    index = sum(best_diffs) / num_to_use
+    valid_rounds = [r for r in all_rounds if r.differential is not None]
+    total_valid = len(valid_rounds)
 
-    return round(index, 1)
+    # 1. Fetch the rules config (could be a tuple or None)
+    rules = _num_differentials_to_use(total_valid)
+
+    # 💡 FIX: Check if rules is None BEFORE trying to unpack it!
+    if rules is None:
+        return "N/A", set()
+
+    # 2. Safely unpack now that we know it's a valid tuple
+    num_to_use, adjustment = rules
+
+    # 3. Sort and slice actual objects to preserve database row IDs
+    sorted_rounds = sorted(valid_rounds, key=lambda r: float(r.differential))
+    counting_rounds = sorted_rounds[:num_to_use]
+    counting_ids = {r.id for r in counting_rounds}
+
+    # 4. Calculate average and apply the WHS adjustment modifier
+    total_diff = sum(float(r.differential) for r in counting_rounds)
+    average_diff = total_diff / num_to_use
+    final_index = round(average_diff + adjustment, 1)
+
+    return final_index, counting_ids
