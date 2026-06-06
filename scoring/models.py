@@ -77,11 +77,12 @@ class Round(models.Model):
     date = models.DateField(default=timezone.now)
     total_gross_score = models.IntegerField(default=0)
     completed_holes = models.IntegerField(default=18)
-    # We allow null=True here so the import can save before calculating the diff
     differential = models.DecimalField(
         max_digits=5, decimal_places=2, editable=False, null=True, blank=True
     )
+    created_at = models.DateTimeField(default=timezone.now)
     external_url = models.URLField(max_length=500, null=True, blank=True)
+
 
     @property
     def total_score(self):
