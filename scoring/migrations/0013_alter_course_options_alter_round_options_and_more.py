@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("scoring", "0012_alter_course_slug"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
