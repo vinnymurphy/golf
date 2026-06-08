@@ -109,4 +109,89 @@
             </div>
         </div>
     </div>
+    <div class="card bg-dark text-white border-secondary mb-4">
+        <div class="card-header border-secondary d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 fw-bold">
+                <i class="bi bi-graph-up text-primary me-2"></i>Performance History
+            </h5>
+            <small class="text-muted">Last 20 Rounds</small>
+        </div>
+        <div class="card-body">
+            <div style="position: relative; height:300px; width:100%;">
+                <canvas id="performanceChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+    // 1. Safely parse the Django JSON context strings into live JS arrays
+    const dates = {{ chart_dates_json|safe }};
+    const grossScores = {{ chart_scores_json|safe }};
+    const handicaps = {{ chart_handicaps_json|safe }};
+
+    // 2. Target the canvas element context
+    const ctx = document.getElementById('performanceChart').getContext('2d');
+
+    // 3. Initialize the dual-axis chart configuration
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [
+                {
+                    label: 'Handicap Index',
+                    data: handicaps,
+                    borderColor: '#0d6efd', // Bootstrap primary blue
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.3, // Smoothes out the line curves
+                    yAxisID: 'yHandicap',
+                    spanGaps: true // Skips "N/A" null indices smoothly
+                },
+                {
+                    label: 'Gross Score',
+                    data: grossScores,
+                    borderColor: '#198754', // Bootstrap success green
+                    backgroundColor: 'rgba(25, 135, 84, 0.2)',
+                    borderWidth: 1.5,
+                    borderDash: [4, 4], // Dotted line effect so it doesn't fight the handicap line
+                    pointStyle: 'circle',
+                    pointRadius: 4,
+                    yAxisID: 'yScore'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                // Left Axis: For Gross Scores (e.g., 75 to 110)
+                yScore: {
+                    type: 'linear',
+                    position: 'left',
+                    title: { display: true, text: 'Gross Score', color: '#198754' },
+                    grid: { color: '#2b3035' }, // Subdued gridlines for dark mode
+                    ticks: { color: '#adb5bd' }
+                },
+                // Right Axis: For Handicap Indices (e.g., 5.0 to 30.0)
+                yHandicap: {
+                    type: 'linear',
+                    position: 'right',
+                    title: { display: true, text: 'Handicap Index', color: '#0d6efd' },
+                    grid: { drawOnChartArea: false }, // Avoids double gridline clutter
+                    ticks: { color: '#adb5bd' }
+                },
+                x: {
+                    grid: { color: '#2b3035' },
+                    ticks: { color: '#adb5bd', maxRotation: 45, minRotation: 45 }
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: { color: '#fff' }
+                }
+            }
+        }
+    });
+    </script>
 {% endblock %}
