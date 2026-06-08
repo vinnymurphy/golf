@@ -1,5 +1,8 @@
+import json
+
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Avg, Min
 from django.forms import inlineformset_factory
 from django.http import HttpResponse
@@ -47,6 +50,23 @@ def player_profile(request, username):
 
     all_user_rounds = Round.objects.filter(user=player)
 
+    recent_rounds = all_user_rounds.order_by("-date")[:20][::-1]
+    chart_dates, chart_scores, chart_handicaps = [], [], []
+    for r in recent_rounds:
+        chart_dates.append(r.date.strftime("%b %d, %Y"))
+        chart_scores.append(
+            r.total_gross_score if r.total_gross_score is not None else None
+        )
+        history_dataset = Round.objects.filter(user=player, date__lte=r.date)
+        result = calculate_handicap(history_dataset)
+        if isinstance(result, tuple):
+            h_index = result[0]
+        else:
+            h_index = result
+        if h_index == "N/A":
+            chart_handicaps.append(None)
+        else:
+            chart_handicaps.append(float(h_index))
     # 1. Calculate WHS Handicap Index
     handicap_index, counting_ids = calculate_handicap(player)
 
@@ -56,8 +76,7 @@ def player_profile(request, username):
         avg_score=Avg("total_gross_score"),
         best_diff=Min("differential"),
     )
-
-    # 3. Calculate Form Trend (Average of last 3 rounds vs. overall handicap)
+    # 3. Calculate Form Trend (Aver age of last 3 rounds vs. overall handicap)
     recent_3_rounds = all_user_rounds.order_by("-date")[:3]
     if recent_3_rounds.count() >= 3:
         recent_3_avg = (
@@ -85,6 +104,9 @@ def player_profile(request, username):
         "avg_score": round(stats["avg_score"], 1) if stats["avg_score"] else None,
         "best_diff": stats["best_diff"],
         "trend_metric": trend_metric,
+        "chart_dates_json": json.dumps(chart_dates, cls=DjangoJSONEncoder),
+        "chart_scores_json": json.dumps(chart_scores, cls=DjangoJSONEncoder),
+        "chart_handicaps_json": json.dumps(chart_handicaps, cls=DjangoJSONEncoder),
     }
     return render(request, "scoring/player_profile.html", context)
 

@@ -83,7 +83,6 @@ class Round(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     external_url = models.URLField(max_length=500, null=True, blank=True)
 
-
     @property
     def total_score(self):
         # Use 'scores' because that is the related_name we set in the migration
