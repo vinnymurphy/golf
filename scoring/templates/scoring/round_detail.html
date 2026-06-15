@@ -20,7 +20,16 @@
                     <tr>
                         <td>{{ score.hole.hole_number }}</td>
                         <td>{{ score.hole.par }}</td>
-                        <td>{{ score.strokes }}</td>
+                        <td>
+                            {{ score.strokes }}
+                            {% if score.relative_to_par > 0 %}
+                                <span class="fw-bold text-danger">(+{{ score.relative_to_par }})</span>
+                            {% elif score.relative_to_par < 0 %}
+                                <span class="fw-bold text-success">({{ score.relative_to_par }})</span>
+                            {% else %}
+                                <span class="text-muted">(0)</span>
+                            {% endif %}
+                        </td>
                     </tr>
                 {% endfor %}
             </tbody>

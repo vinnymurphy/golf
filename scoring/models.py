@@ -184,6 +184,9 @@ class HoleScore(models.Model):
             raise ValidationError("Putts cannot be negative")
         return super().clean()
 
+    def relative_to_par(self):
+        return self.strokes - self.hole.par
+
     def __str__(self):
         user_display = self.round.user.get_full_name() or self.round.user.username
         return f"{user_display} - Hole {self.hole.hole_number}: {self.strokes} strokes"
