@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-from decimal import Decimal
 
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
@@ -82,7 +81,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(f"Failed: {failed_count}"))
 
     def _validate_entry(self, entry):
-        """Validate that entry contains all required fields."""
+        """Validate that entry contains all required fields and valid data types."""
         required_fields = [
             "username",
             "course",
@@ -93,6 +92,22 @@ class Command(BaseCommand):
         if missing := [f for f in required_fields if f not in entry]:
             raise ValueError(f"Missing required fields: {', '.join(missing)}")
 
+        # Validate numeric fields
+        try:
+            total_gross_score = int(entry["total_gross_score"])
+            completed_holes = int(entry["completed_holes"])
+
+            if total_gross_score <= 0:
+                raise ValueError("total_gross_score must be a positive integer")
+            if completed_holes < 1 or completed_holes > 18:
+                raise ValueError("completed_holes must be between 1 and 18")
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Invalid numeric field: {e}") from e
+
+        # Validate username is a string
+        if not isinstance(entry.get("username"), str) or not entry["username"].strip():
+            raise ValueError("username must be a non-empty string")
+
         # Validate hole_scores if provided
         if entry.get("hole_scores"):
             if "tee_set_name" not in entry:
@@ -102,18 +117,35 @@ class Command(BaseCommand):
             if not isinstance(entry["hole_scores"], list):
                 raise ValueError("hole_scores must be a list")
 
+            # Validate each hole score is a positive integer
+            if not entry["hole_scores"]:
+                raise ValueError("hole_scores list cannot be empty")
+
+            try:
+                hole_scores = [int(s) for s in entry["hole_scores"]]
+                if any(s <= 0 for s in hole_scores):
+                    raise ValueError("All hole scores must be positive integers")
+            except (ValueError, TypeError) as exc:
+                raise ValueError(
+                    "All hole scores must be valid positive integers"
+                ) from exc
+
     @transaction.atomic
     def _import_round(self, entry, verbose=False):
         """Import a single round with all associated data."""
-        username = entry["username"].lower()
+        username = entry["username"].lower().strip()
 
-        # Get or validate user
-        user, created = User.objects.get_or_create(
-            username=username, defaults={"is_active": True}
-        )
-        if created:
-            if verbose:
-                print(f"Created new user: {username}")
+        # Get or create user with validation
+        try:
+            user, created = User.objects.get_or_create(
+                username=username, defaults={"is_active": True}
+            )
+            if created and verbose:
+                logger.info(f"Created new user: {username}")
+        except Exception as e:
+            raise ValueError(f"Failed to create/retrieve user '{username}': {e}") from e
+
+        # Get course
         try:
             course = Course.objects.get(name=entry["course"])
         except Course.DoesNotExist as exc:
@@ -122,36 +154,50 @@ class Command(BaseCommand):
             ) from exc
 
         # Create the Round
-        new_round = Round.objects.create(
-            user=user,
-            course=course,
-            date=entry["date"],
-            total_gross_score=entry["total_gross_score"],
-            completed_holes=entry["completed_holes"],
-        )
+        try:
+            new_round = Round.objects.create(
+                user=user,
+                course=course,
+                date=entry["date"],
+                total_gross_score=entry["total_gross_score"],
+                completed_holes=entry["completed_holes"],
+            )
+            if verbose:
+                logger.info(f"Created round {new_round.id} for {username}")
+        except Exception as e:
+            raise ValueError(f"Failed to create round for {username}: {e}") from e
 
-        if verbose:
-            logger.info(f"Created round {new_round.id} for {username}")
-
-        # Add Hole Scores if they exist
+        # Add Hole Scores if they exist, then recalculate differential
         if entry.get("hole_scores"):
             self._import_hole_scores(new_round, entry, verbose)
-
-        if new_round.differential is None or new_round.differential == Decimal("0.00"):
             new_round.update_differential()
+            new_round.save()
 
     def _import_hole_scores(self, round_obj, entry, verbose=False):
         """Import hole scores for a round."""
         hole_scores = entry["hole_scores"]
 
+        # Try to get TeeSet by name first, then by color as fallback
+        tee_set = None
         try:
             tee_set = TeeSet.objects.get(
                 course=round_obj.course, name=entry["tee_set_name"]
             )
-        except TeeSet.DoesNotExist as e:
-            raise ValueError(
-                f"Tee set '{entry['tee_set_name']}' not found for course '{round_obj.course.name}'"
-            ) from e
+        except TeeSet.DoesNotExist:
+            # Fallback: try to match by color
+            try:
+                tee_set = TeeSet.objects.get(
+                    course=round_obj.course, color=entry["tee_set_name"]
+                )
+                if verbose:
+                    logger.info(
+                        f"Matched tee_set_name '{entry['tee_set_name']}' by color"
+                    )
+            except TeeSet.DoesNotExist as e:
+                raise ValueError(
+                    f"Tee set '{entry['tee_set_name']}' not found for course '{round_obj.course.name}' "
+                    f"(checked both 'name' and 'color' fields)"
+                ) from e
 
         # Fetch holes in order
         holes = list(
@@ -162,14 +208,16 @@ class Command(BaseCommand):
 
         if len(holes) != len(hole_scores):
             raise ValueError(
-                f"Expected {len(hole_scores)} holes but only found {len(holes)} in tee set '{entry['tee_set_name']}'"
+                f"Expected {len(hole_scores)} holes but only found {len(holes)} "
+                f"in tee set '{entry['tee_set_name']}'"
             )
 
-        # Validate total
+        # Validate total matches expected gross score
         total_hole_score = sum(hole_scores)
         if total_hole_score != entry["total_gross_score"]:
             raise ValueError(
-                f"Total gross score {entry['total_gross_score']} does not match sum of hole scores {total_hole_score}"
+                f"Total gross score {entry['total_gross_score']} does not match "
+                f"sum of hole scores {total_hole_score}"
             )
 
         # Bulk create hole scores for performance
