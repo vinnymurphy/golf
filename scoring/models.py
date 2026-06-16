@@ -1,10 +1,14 @@
+import logging
 from decimal import Decimal
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+from django.utils.functional import cached_property
 from django.utils.text import slugify
+
+logger = logging.getLogger(__name__)
 
 
 class Course(models.Model):
@@ -51,7 +55,11 @@ class TeeSet(models.Model):
 
 class Hole(models.Model):
     tee_set = models.ForeignKey(
-        TeeSet, on_delete=models.CASCADE, related_name="holes", null=True, blank=True
+        TeeSet,
+        on_delete=models.CASCADE,
+        related_name="holes",
+        null=True,
+        blank=True,
     )
     hole_number = models.IntegerField()
     par = models.IntegerField(default=4)
@@ -83,7 +91,7 @@ class Round(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     external_url = models.URLField(max_length=500, null=True, blank=True)
 
-    @property
+    @cached_property
     def total_score(self):
         # Use 'scores' because that is the related_name we set in the migration
         if self.scores.exists():
@@ -143,7 +151,7 @@ class Round(models.Model):
 
             return self.differential
         except (ValueError, ZeroDivisionError) as e:
-            print(f"Error calculating differential for round {self.id}: {e}")
+            logger.error(f"Error calculating differential for round {self.id}: {e}")
             return None
 
     class Meta:
@@ -170,8 +178,18 @@ class Round(models.Model):
 
         super().save(*args, **kwargs)
 
+    def clean(self):
+        if self.completed_holes < 9 or self.completed_holes > 18:
+            raise ValidationError("Completed holes must be between 9 and 18")
+
+
+class HoleScoreManager(models.Manager):
+    def with_related(self):
+        return self.select_related("hole__tee_set")
+
 
 class HoleScore(models.Model):
+    objects = HoleScoreManager()
     round = models.ForeignKey(Round, on_delete=models.CASCADE, related_name="scores")
     hole = models.ForeignKey(Hole, on_delete=models.CASCADE)
     strokes = models.IntegerField()
