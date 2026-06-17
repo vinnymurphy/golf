@@ -28,24 +28,28 @@ HANDICAP_DEFAULT_DISPLAY = "N/A"
 # Helper Functions
 # ============================================================================
 
+
 def _extract_handicap_value(handicap_result):
     """
     Extract handicap index from calculate_handicap() result.
-    Handles both tuple and single value returns.
+    Handles both HandicapResult objects and legacy tuple returns.
     """
     if isinstance(handicap_result, tuple):
         return handicap_result[0]
+    # HandicapResult dataclass has an .index attribute
+    if hasattr(handicap_result, "index"):
+        return handicap_result.index
     return handicap_result
 
 
 def _get_numeric_handicap(handicap_value, default=None):
     """
     Convert handicap value to float, with fallback for "N/A".
-    
+
     Args:
         handicap_value: The handicap index value
         default: Value to return if handicap is "N/A" or None
-        
+
     Returns:
         float or the default value
     """
@@ -57,82 +61,80 @@ def _get_numeric_handicap(handicap_value, default=None):
 def _build_player_chart_data(player, recent_rounds):
     """
     Build chart data for player profile (dates, scores, handicaps).
-    
+
     Args:
         player: User object
         recent_rounds: QuerySet of recent Round objects
-        
+
     Returns:
         tuple: (chart_dates, chart_scores, chart_handicaps)
     """
     chart_dates, chart_scores, chart_handicaps = [], [], []
-    
+
     for round_obj in recent_rounds:
         chart_dates.append(round_obj.date.strftime("%b %d, %Y"))
-        
+
         # Add score if available
         if round_obj.total_gross_score is not None:
             chart_scores.append(round_obj.total_gross_score)
         else:
             chart_scores.append(None)
-        
+
         # Calculate handicap up to this date
         history_dataset = Round.objects.filter(user=player, date__lte=round_obj.date)
         h_index = _extract_handicap_value(calculate_handicap(history_dataset))
-        
+
         if h_index != HANDICAP_DEFAULT_DISPLAY:
             chart_handicaps.append(float(h_index))
         else:
             chart_handicaps.append(None)
-    
+
     return chart_dates, chart_scores, chart_handicaps
 
 
 def _calculate_form_trend(recent_rounds, handicap_index):
-    """
-    Calculate form trend (average of recent rounds vs overall handicap).
-    
+    """Calculate form trend (average of recent rounds vs overall
+    handicap).
+
     Args:
         recent_rounds: QuerySet of recent Round objects
         handicap_index: Player's current handicap index
-        
+
     Returns:
         float or None: Trend metric or None if not enough rounds
     """
     if recent_rounds.count() < RECENT_ROUNDS_TREND:
         return None
-    
+
     valid_differentials = [
-        float(r.differential)
-        for r in recent_rounds
-        if r.differential is not None
+        float(r.differential) for r in recent_rounds if r.differential is not None
     ]
-    
+
     if not valid_differentials:
         return None
-    
+
     recent_avg = sum(valid_differentials) / len(valid_differentials)
-    
+
     if handicap_index != HANDICAP_DEFAULT_DISPLAY:
         return round(recent_avg - float(handicap_index), 1)
-    
+
     return 0.0
 
 
 def _build_leaderboard_entry(buddy, handicap, recent_scores):
     """
     Build a single leaderboard entry.
-    
+
     Args:
         buddy: User object
         handicap: Handicap index value
         recent_scores: List of recent scores
-        
+
     Returns:
         dict: Leaderboard entry
     """
     handicap_display = handicap if handicap is not None else HANDICAP_DEFAULT_DISPLAY
-    
+
     return {
         "user": buddy,
         "handicap": handicap_display,
@@ -144,10 +146,10 @@ def _build_leaderboard_entry(buddy, handicap, recent_scores):
 def _build_course_leaderboard_data(course=None):
     """
     Build leaderboard data for a specific course or globally.
-    
+
     Args:
         course: Course object or None for global leaderboard
-        
+
     Returns:
         list: Sorted leaderboard data
     """
@@ -159,13 +161,14 @@ def _build_course_leaderboard_data(course=None):
         )
     else:
         player_ids = Round.objects.values_list("user", flat=True).distinct()
-    
+
     buddies = User.objects.filter(id__in=player_ids).prefetch_related("round_set")
     leaderboard_data = []
-    
+
     for buddy in buddies:
-        handicap, _ = calculate_handicap(buddy)
-        
+        handicap_result = calculate_handicap(buddy)
+        handicap = handicap_result.index
+
         if course:
             recent_rounds = (
                 Round.objects.filter(user=buddy, course=course)
@@ -180,23 +183,23 @@ def _build_course_leaderboard_data(course=None):
                 .order_by("-date")[:RECENT_GLOBAL_ROUNDS]
             )
             recent_scores = [
-                {"score": r.total_score, "course": r.course.name}
-                for r in recent_rounds
+                {"score": r.total_score, "course": r.course.name} for r in recent_rounds
             ]
-        
+
         leaderboard_data.append(
             _build_leaderboard_entry(buddy, handicap, recent_scores)
         )
-    
+
     # Sort by handicap (lowest to highest)
     leaderboard_data.sort(key=lambda x: _get_numeric_handicap(x["handicap"]))
-    
+
     return leaderboard_data
 
 
 # ============================================================================
 # Views
 # ============================================================================
+
 
 def index(request):
     return HttpResponse("Welcome to the Golf Scoring Dashboard!")
@@ -219,18 +222,16 @@ def round_detail(request, round_id):
     """
     round_obj = get_object_or_404(Round, pk=round_id)
     hole_scores = (
-        round_obj.scores.all()
-        .select_related("hole")
-        .order_by("hole__hole_number")
+        round_obj.scores.all().select_related("hole").order_by("hole__hole_number")
     )
-    
+
     context = {
         "round": round_obj,
         "hole_scores": hole_scores,
         "total": round_obj.total_score,
         "relative_to_par": round_obj.total_score - round_obj.total_par,
     }
-    
+
     return render(request, "scoring/round_detail.html", context)
 
 
@@ -240,29 +241,31 @@ def player_profile(request, username):
     """
     player = get_object_or_404(User, username=username)
     all_user_rounds = Round.objects.filter(user=player)
-    
+
     # Get recent rounds for chart (last 20, ordered ascending)
     recent_rounds = all_user_rounds.order_by("-date")[:RECENT_ROUNDS_DISPLAY][::-1]
-    
+
     # Build chart data
     chart_dates, chart_scores, chart_handicaps = _build_player_chart_data(
         player, recent_rounds
     )
-    
+
     # Calculate overall handicap
-    handicap_index, counting_ids = calculate_handicap(player)
-    
+    handicap_result = calculate_handicap(player)
+    handicap_index = handicap_result.index
+    counting_ids = handicap_result.counting_round_ids
+
     # Get aggregate statistics
     stats = all_user_rounds.aggregate(
         low_score=Min("total_gross_score"),
         avg_score=Avg("total_gross_score"),
         best_diff=Min("differential"),
     )
-    
+
     # Calculate form trend
     recent_3_rounds = all_user_rounds.order_by("-date")[:RECENT_ROUNDS_TREND]
     trend_metric = _calculate_form_trend(recent_3_rounds, handicap_index)
-    
+
     context = {
         "player": player,
         "rounds": all_user_rounds.order_by("-date"),
@@ -270,14 +273,14 @@ def player_profile(request, username):
         "handicap_index": handicap_index,
         "counting_ids": counting_ids,
         "low_score": stats["low_score"],
-        "avg_score": round(stats["avg_score"], 1) if stats["avg_score"] else None,
+        "avg_score": (round(stats["avg_score"], 1) if stats["avg_score"] else None),
         "best_diff": stats["best_diff"],
         "trend_metric": trend_metric,
         "chart_dates_json": json.dumps(chart_dates, cls=DjangoJSONEncoder),
         "chart_scores_json": json.dumps(chart_scores, cls=DjangoJSONEncoder),
         "chart_handicaps_json": json.dumps(chart_handicaps, cls=DjangoJSONEncoder),
     }
-    
+
     return render(request, "scoring/player_profile.html", context)
 
 
@@ -287,7 +290,7 @@ def enter_scorecard(request, course_id):
     Create a new round and enter hole scores using an inline formset.
     """
     course = get_object_or_404(Course, pk=course_id)
-    
+
     ScorecardFormSet = inlineformset_factory(
         Round,
         HoleScore,
@@ -295,18 +298,18 @@ def enter_scorecard(request, course_id):
         extra=GOLF_HOLES,
         can_delete=False,
     )
-    
+
     if request.method == "POST":
         new_round = Round(user=request.user, course=course)
         formset = ScorecardFormSet(request.POST, instance=new_round)
-        
+
         if formset.is_valid():
             new_round.save()
             formset.save()
             return redirect("scoring:round_detail", round_id=new_round.id)
     else:
         formset = ScorecardFormSet()
-    
+
     return render(
         request,
         "scoring/enter_scorecard.html",
@@ -321,22 +324,22 @@ def setup_course_holes(request, course_id):
     course = get_object_or_404(Course, pk=course_id)
     tee_sets = course.tee_sets.all()
     hole_range = range(1, GOLF_HOLES + 1)
-    
+
     if request.method == "POST":
         for hole_number in hole_range:
             par_value = request.POST.get(f"par_{hole_number}")
-            
+
             for tee in tee_sets:
                 yardage_value = request.POST.get(f"yardage_{tee.id}_{hole_number}")
-                
+
                 Hole.objects.update_or_create(
                     tee_set=tee,
                     hole_number=hole_number,
                     defaults={"par": par_value, "yardage": yardage_value},
                 )
-        
+
         return redirect("scoring:course_detail", course_id=course.id)
-    
+
     return render(
         request,
         "scoring/setup_holes_grid.html",
@@ -354,7 +357,7 @@ def load_tees(request):
     """
     course_id = request.GET.get("course")
     tees = TeeSet.objects.filter(course_id=course_id).order_by("color")
-    
+
     return render(
         request,
         "scoring/tee_dropdown_list_options.html",
@@ -367,7 +370,7 @@ def start_round(request):
     Display list of courses to start a new round.
     """
     courses = Course.objects.all()
-    
+
     return render(request, "scoring/start_round.html", {"courses": courses})
 
 
@@ -377,13 +380,13 @@ def leaderboard_view(request, slug):
     """
     course = get_object_or_404(Course, slug=slug)
     leaderboard_data = _build_course_leaderboard_data(course=course)
-    
+
     context = {
         "leaderboard": leaderboard_data,
         "course": course,
         "all_courses": Course.objects.all(),
     }
-    
+
     return render(request, "scoring/leaderboard.html", context)
 
 
@@ -392,12 +395,12 @@ def global_leaderboard(request):
     Display global leaderboard across all courses.
     """
     leaderboard_data = _build_course_leaderboard_data(course=None)
-    
+
     context = {
         "leaderboard": leaderboard_data,
         "all_courses": Course.objects.all(),
     }
-    
+
     return render(request, "scoring/global_leaderboard.html", context)
 
 
@@ -412,11 +415,11 @@ def add_round(request):
             new_round = form.save(commit=False)
             new_round.user = request.user
             new_round.save()
-            
+
             return redirect("scoring:leaderboard")
     else:
         form = RoundForm()
-    
+
     return render(request, "scoring/add_round.html", {"form": form})
 
 
@@ -428,13 +431,11 @@ def enter_scores(request, round_id):
     """
     round_obj = get_object_or_404(Round, pk=round_id, user=request.user)
     holes = Hole.objects.filter(course=round_obj.course).order_by("hole_number")
-    
+
     # Fetch yardage for each hole in the round's tee set
     for hole in holes:
-        hole.current_yardage = hole.yardages.filter(
-            tee_set=round_obj.tee_set
-        ).first()
-    
+        hole.current_yardage = hole.yardages.filter(tee_set=round_obj.tee_set).first()
+
     if request.method == "POST":
         formset = HoleScoreFormSet(request.POST, instance=round_obj)
         if formset.is_valid():
@@ -442,9 +443,9 @@ def enter_scores(request, round_id):
             return redirect("scoring:leaderboard")
     else:
         formset = HoleScoreFormSet(instance=round_obj)
-    
+
     forms_with_holes = zip(formset, holes)
-    
+
     return render(
         request,
         "scoring/enter_scores.html",

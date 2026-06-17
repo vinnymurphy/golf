@@ -56,11 +56,10 @@ class Command(BaseCommand):
                 if rounds_to_save:
                     Round.objects.bulk_update(rounds_to_save, ["differential"])
 
-            handicap, counting_ids = calculate_handicap(user)
+            result = calculate_handicap(user)
+            handicap = result.index
             display_val = (
-                handicap
-                if isinstance(handicap, (int, float, Decimal))
-                else "N/A (Not enough rounds)"
+                handicap if handicap is not None else "N/A (Not enough rounds)"
             )
 
             self.stdout.write(
