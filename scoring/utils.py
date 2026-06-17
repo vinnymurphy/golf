@@ -35,6 +35,7 @@ MINIMUM_VALID_ROUNDS = 3
 @dataclass
 class HandicapResult:
     """Result of handicap calculation."""
+
     index: float | None
     counting_round_ids: set[int]
 
