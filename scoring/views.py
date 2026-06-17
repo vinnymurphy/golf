@@ -231,7 +231,7 @@ def global_leaderboard(request):
         handicap, _ = calculate_handicap(buddy)
 
         # 2. Most recent 5 rounds ANYWHERE
-        recent_rounds = Round.objects.filter(user=buddy).order_by("-date")[:5]
+        recent_rounds = Round.objects.filter(user=buddy).order_by("-date")[:8]
 
         # --- THIS IS THE FIX ---
         # Map the Round objects into the format the template expects
