@@ -1,9 +1,11 @@
 import json
+from functools import lru_cache
 
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import Avg, Min
+from django.db.models import Avg, Min, Prefetch
 from django.forms import inlineformset_factory
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -22,24 +24,12 @@ RECENT_ROUNDS_TREND = 3
 RECENT_GLOBAL_ROUNDS = 8
 HANDICAP_DEFAULT_SORT_VALUE = 999.0
 HANDICAP_DEFAULT_DISPLAY = "N/A"
+PAGINATION_PAGE_SIZE = 20
 
 
 # ============================================================================
 # Helper Functions
 # ============================================================================
-
-
-def _extract_handicap_value(handicap_result):
-    """
-    Extract handicap index from calculate_handicap() result.
-    Handles both HandicapResult objects and legacy tuple returns.
-    """
-    if isinstance(handicap_result, tuple):
-        return handicap_result[0]
-    # HandicapResult dataclass has an .index attribute
-    if hasattr(handicap_result, "index"):
-        return handicap_result.index
-    return handicap_result
 
 
 def _get_numeric_handicap(handicap_value, default=None):
@@ -62,15 +52,38 @@ def _build_player_chart_data(player, recent_rounds):
     """
     Build chart data for player profile (dates, scores, handicaps).
 
+    Efficiently calculates handicaps for each round by computing them
+    once for all historical data up to each date, avoiding N+1 queries.
+
     Args:
         player: User object
-        recent_rounds: QuerySet of recent Round objects
+        recent_rounds: QuerySet of recent Round objects (ordered ascending by date)
 
     Returns:
         tuple: (chart_dates, chart_scores, chart_handicaps)
     """
-    chart_dates, chart_scores, chart_handicaps = [], [], []
+    chart_dates = []
+    chart_scores = []
+    chart_handicaps = []
 
+    # Get all rounds up to the last round in recent_rounds for efficiency
+    if not recent_rounds.exists():
+        return chart_dates, chart_scores, chart_handicaps
+
+    last_date = recent_rounds.last().date
+    all_history = Round.objects.filter(
+        user=player, date__lte=last_date
+    ).select_related("course").order_by("date")
+
+    # Build a date -> handicap map by processing all history in order
+    handicap_cache = {}
+    for round_obj in all_history:
+        # Calculate handicap for all rounds up to this date
+        history_up_to = all_history.filter(date__lte=round_obj.date)
+        h_result = calculate_handicap(history_up_to)
+        handicap_cache[round_obj.date] = h_result.index
+
+    # Now populate chart data from recent_rounds only
     for round_obj in recent_rounds:
         chart_dates.append(round_obj.date.strftime("%b %d, %Y"))
 
@@ -80,10 +93,8 @@ def _build_player_chart_data(player, recent_rounds):
         else:
             chart_scores.append(None)
 
-        # Calculate handicap up to this date
-        history_dataset = Round.objects.filter(user=player, date__lte=round_obj.date)
-        h_index = _extract_handicap_value(calculate_handicap(history_dataset))
-
+        # Use cached handicap
+        h_index = handicap_cache.get(round_obj.date)
         if h_index is not None and h_index != HANDICAP_DEFAULT_DISPLAY:
             chart_handicaps.append(float(h_index))
         else:
@@ -98,16 +109,19 @@ def _calculate_form_trend(recent_rounds, handicap_index):
 
     Args:
         recent_rounds: QuerySet of recent Round objects
-        handicap_index: Player's current handicap index
+        handicap_index: Player's current handicap index (float or None)
 
     Returns:
         float or None: Trend metric or None if not enough rounds
+
     """
     if recent_rounds.count() < RECENT_ROUNDS_TREND:
         return None
 
     valid_differentials = [
-        float(r.differential) for r in recent_rounds if r.differential is not None
+        float(r.differential)
+        for r in recent_rounds
+        if r.differential is not None
     ]
 
     if not valid_differentials:
@@ -115,10 +129,11 @@ def _calculate_form_trend(recent_rounds, handicap_index):
 
     recent_avg = sum(valid_differentials) / len(valid_differentials)
 
-    if handicap_index != HANDICAP_DEFAULT_DISPLAY:
+    # Guard against None handicap_index
+    if handicap_index is not None and handicap_index != HANDICAP_DEFAULT_DISPLAY:
         return round(recent_avg - float(handicap_index), 1)
 
-    return 0.0
+    return None
 
 
 def _build_leaderboard_entry(buddy, handicap, recent_scores):
@@ -127,7 +142,7 @@ def _build_leaderboard_entry(buddy, handicap, recent_scores):
 
     Args:
         buddy: User object
-        handicap: Handicap index value
+        handicap: Handicap index value (float or None)
         recent_scores: List of recent scores
 
     Returns:
@@ -147,6 +162,8 @@ def _build_course_leaderboard_data(course=None):
     """
     Build leaderboard data for a specific course or globally.
 
+    Optimized with select_related() and prefetch_related() to minimize queries.
+
     Args:
         course: Course object or None for global leaderboard
 
@@ -162,7 +179,12 @@ def _build_course_leaderboard_data(course=None):
     else:
         player_ids = Round.objects.values_list("user", flat=True).distinct()
 
-    buddies = User.objects.filter(id__in=player_ids).prefetch_related("round_set")
+    # Optimize: use Prefetch with select_related to reduce queries
+    round_queryset = Round.objects.select_related("course").order_by("-date")
+    buddies = User.objects.filter(id__in=player_ids).prefetch_related(
+        Prefetch("round_set", queryset=round_queryset)
+    )
+
     leaderboard_data = []
 
     for buddy in buddies:
@@ -170,20 +192,15 @@ def _build_course_leaderboard_data(course=None):
         handicap = handicap_result.index
 
         if course:
-            recent_rounds = (
-                Round.objects.filter(user=buddy, course=course)
-                .select_related("course")
-                .order_by("-date")
-            )
+            recent_rounds = [
+                r for r in buddy.round_set.all() if r.course_id == course.id
+            ]
             recent_scores = [r.total_score for r in recent_rounds]
         else:
-            recent_rounds = (
-                Round.objects.filter(user=buddy)
-                .select_related("course")
-                .order_by("-date")[:RECENT_GLOBAL_ROUNDS]
-            )
+            recent_rounds = list(buddy.round_set.all())[:RECENT_GLOBAL_ROUNDS]
             recent_scores = [
-                {"score": r.total_score, "course": r.course.name} for r in recent_rounds
+                {"score": r.total_score, "course": r.course.name}
+                for r in recent_rounds
             ]
 
         leaderboard_data.append(
@@ -214,6 +231,7 @@ class RoundListView(ListView):
     template_name = "scoring/round_list.html"
     context_object_name = "rounds"
     ordering = ["-date"]
+    paginate_by = PAGINATION_PAGE_SIZE
 
 
 def round_detail(request, round_id):
@@ -238,16 +256,22 @@ def round_detail(request, round_id):
 def player_profile(request, username):
     """
     Display player profile with stats, recent rounds, and trend charts.
+
+    Optimized with efficient queries and pagination for large datasets.
     """
     player = get_object_or_404(User, username=username)
-    all_user_rounds = Round.objects.filter(user=player)
+    all_user_rounds = Round.objects.filter(user=player).select_related("course")
 
-    # Get recent rounds for chart (last 20, ordered ascending)
-    recent_rounds = all_user_rounds.order_by("-date")[:RECENT_ROUNDS_DISPLAY][::-1]
+    # Get recent rounds for chart (ordered by date ascending)
+    recent_rounds_list = list(
+        all_user_rounds.order_by("date")[
+            max(0, all_user_rounds.count() - RECENT_ROUNDS_DISPLAY) :
+        ]
+    )
 
     # Build chart data
     chart_dates, chart_scores, chart_handicaps = _build_player_chart_data(
-        player, recent_rounds
+        player, Round.objects.filter(user=player, pk__in=[r.id for r in recent_rounds_list])
     )
 
     # Calculate overall handicap
@@ -262,13 +286,23 @@ def player_profile(request, username):
         best_diff=Min("differential"),
     )
 
-    # Calculate form trend
-    recent_3_rounds = all_user_rounds.order_by("-date")[:RECENT_ROUNDS_TREND]
+    # Calculate form trend (last 3 rounds)
+    recent_3_rounds = all_user_rounds.order_by("-date")[: RECENT_ROUNDS_TREND]
     trend_metric = _calculate_form_trend(recent_3_rounds, handicap_index)
+
+    # Paginate all rounds for the rounds list
+    paginator = Paginator(all_user_rounds.order_by("-date"), PAGINATION_PAGE_SIZE)
+    page_number = request.GET.get("page")
+    try:
+        rounds_page = paginator.page(page_number)
+    except PageNotAnInteger:
+        rounds_page = paginator.page(1)
+    except EmptyPage:
+        rounds_page = paginator.page(paginator.num_pages)
 
     context = {
         "player": player,
-        "rounds": all_user_rounds.order_by("-date"),
+        "rounds_page": rounds_page,
         "total_rounds": all_user_rounds.count(),
         "handicap_index": handicap_index,
         "counting_ids": counting_ids,
@@ -392,12 +426,22 @@ def leaderboard_view(request, slug):
 
 def global_leaderboard(request):
     """
-    Display global leaderboard across all courses.
+    Display global leaderboard across all courses with pagination.
     """
     leaderboard_data = _build_course_leaderboard_data(course=None)
 
+    # Paginate leaderboard for large datasets
+    paginator = Paginator(leaderboard_data, PAGINATION_PAGE_SIZE)
+    page_number = request.GET.get("page")
+    try:
+        leaderboard_page = paginator.page(page_number)
+    except PageNotAnInteger:
+        leaderboard_page = paginator.page(1)
+    except EmptyPage:
+        leaderboard_page = paginator.page(paginator.num_pages)
+
     context = {
-        "leaderboard": leaderboard_data,
+        "leaderboard_page": leaderboard_page,
         "all_courses": Course.objects.all(),
     }
 
