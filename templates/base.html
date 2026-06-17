@@ -4,9 +4,12 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta name="description" content="Track golf scores and compete with friends on the leaderboard">
+        <meta name="description"
+              content="Track golf scores and compete with friends on the leaderboard">
         <meta name="theme-color" content="#198754">
-        <title>{% block title %}Golf Tracker - BuddyScoring{% endblock %}</title>
+        <title>
+            {% block title %}Golf Tracker - BuddyScoring{% endblock %}
+        </title>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
               rel="stylesheet">
         <link rel="icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
@@ -35,7 +38,13 @@
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
             <div class="container">
                 <a class="navbar-brand" href="{% url 'scoring:global_leaderboard' %}">⛳ BuddyScoring</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <button class="navbar-toggler"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#navbarNav"
+                        aria-controls="navbarNav"
+                        aria-expanded="false"
+                        aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNav">
@@ -46,25 +55,26 @@
                 </div>
             </div>
         </nav>
-
         <main class="container my-4">
             {% if messages %}
                 {% for message in messages %}
-                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show"
+                         role="alert">
                         {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <button type="button"
+                                class="btn-close"
+                                data-bs-dismiss="alert"
+                                aria-label="Close"></button>
                     </div>
                 {% endfor %}
             {% endif %}
             {% block content %}{% endblock %}
         </main>
-
         <footer class="bg-dark text-white text-center py-4 mt-5">
             <div class="container">
                 <p class="mb-0">&copy; 2026 BuddyScoring. All rights reserved.</p>
             </div>
         </footer>
-
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     </body>
 </html>

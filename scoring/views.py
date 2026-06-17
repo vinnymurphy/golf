@@ -1,9 +1,8 @@
 import json
-from functools import lru_cache
 
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Avg, Min, Prefetch
 from django.forms import inlineformset_factory
@@ -71,9 +70,11 @@ def _build_player_chart_data(player, recent_rounds):
         return chart_dates, chart_scores, chart_handicaps
 
     last_date = recent_rounds.last().date
-    all_history = Round.objects.filter(
-        user=player, date__lte=last_date
-    ).select_related("course").order_by("date")
+    all_history = (
+        Round.objects.filter(user=player, date__lte=last_date)
+        .select_related("course")
+        .order_by("date")
+    )
 
     # Build a date -> handicap map by processing all history in order
     handicap_cache = {}
@@ -119,9 +120,7 @@ def _calculate_form_trend(recent_rounds, handicap_index):
         return None
 
     valid_differentials = [
-        float(r.differential)
-        for r in recent_rounds
-        if r.differential is not None
+        float(r.differential) for r in recent_rounds if r.differential is not None
     ]
 
     if not valid_differentials:
@@ -199,8 +198,7 @@ def _build_course_leaderboard_data(course=None):
         else:
             recent_rounds = list(buddy.round_set.all())[:RECENT_GLOBAL_ROUNDS]
             recent_scores = [
-                {"score": r.total_score, "course": r.course.name}
-                for r in recent_rounds
+                {"score": r.total_score, "course": r.course.name} for r in recent_rounds
             ]
 
         leaderboard_data.append(
@@ -271,7 +269,8 @@ def player_profile(request, username):
 
     # Build chart data
     chart_dates, chart_scores, chart_handicaps = _build_player_chart_data(
-        player, Round.objects.filter(user=player, pk__in=[r.id for r in recent_rounds_list])
+        player,
+        Round.objects.filter(user=player, pk__in=[r.id for r in recent_rounds_list]),
     )
 
     # Calculate overall handicap
@@ -287,7 +286,7 @@ def player_profile(request, username):
     )
 
     # Calculate form trend (last 3 rounds)
-    recent_3_rounds = all_user_rounds.order_by("-date")[: RECENT_ROUNDS_TREND]
+    recent_3_rounds = all_user_rounds.order_by("-date")[:RECENT_ROUNDS_TREND]
     trend_metric = _calculate_form_trend(recent_3_rounds, handicap_index)
 
     # Paginate all rounds for the rounds list
