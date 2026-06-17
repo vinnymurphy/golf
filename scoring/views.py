@@ -84,7 +84,7 @@ def _build_player_chart_data(player, recent_rounds):
         history_dataset = Round.objects.filter(user=player, date__lte=round_obj.date)
         h_index = _extract_handicap_value(calculate_handicap(history_dataset))
 
-        if h_index != HANDICAP_DEFAULT_DISPLAY:
+        if h_index is not None and h_index != HANDICAP_DEFAULT_DISPLAY:
             chart_handicaps.append(float(h_index))
         else:
             chart_handicaps.append(None)
