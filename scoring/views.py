@@ -51,12 +51,9 @@ def _build_player_chart_data(player, recent_rounds):
     """
     Build chart data for player profile (dates, scores, handicaps).
 
-    Efficiently calculates handicaps for each round by computing them
-    once for all historical data up to each date, avoiding N+1 queries.
-
     Args:
         player: User object
-        recent_rounds: QuerySet of recent Round objects (ordered ascending by date)
+        recent_rounds: Iterable of recent Round objects (ordered ascending by date)
 
     Returns:
         tuple: (chart_dates, chart_scores, chart_handicaps)
@@ -65,26 +62,6 @@ def _build_player_chart_data(player, recent_rounds):
     chart_scores = []
     chart_handicaps = []
 
-    # Get all rounds up to the last round in recent_rounds for efficiency
-    if not recent_rounds.exists():
-        return chart_dates, chart_scores, chart_handicaps
-
-    last_date = recent_rounds.last().date
-    all_history = (
-        Round.objects.filter(user=player, date__lte=last_date)
-        .select_related("course")
-        .order_by("date")
-    )
-
-    # Build a date -> handicap map by processing all history in order
-    handicap_cache = {}
-    for round_obj in all_history:
-        # Calculate handicap for all rounds up to this date
-        history_up_to = all_history.filter(date__lte=round_obj.date)
-        h_result = calculate_handicap(history_up_to)
-        handicap_cache[round_obj.date] = h_result.index
-
-    # Now populate chart data from recent_rounds only
     for round_obj in recent_rounds:
         chart_dates.append(round_obj.date.strftime("%b %d, %Y"))
 
@@ -94,8 +71,8 @@ def _build_player_chart_data(player, recent_rounds):
         else:
             chart_scores.append(None)
 
-        # Use cached handicap
-        h_index = handicap_cache.get(round_obj.date)
+        history_up_to = Round.objects.filter(user=player, date__lte=round_obj.date)
+        h_index = calculate_handicap(history_up_to).index
         if h_index is not None and h_index != HANDICAP_DEFAULT_DISPLAY:
             chart_handicaps.append(float(h_index))
         else:
@@ -269,8 +246,7 @@ def player_profile(request, username):
 
     # Build chart data
     chart_dates, chart_scores, chart_handicaps = _build_player_chart_data(
-        player,
-        Round.objects.filter(user=player, pk__in=[r.id for r in recent_rounds_list]),
+        player, recent_rounds_list
     )
 
     # Calculate overall handicap
@@ -301,6 +277,7 @@ def player_profile(request, username):
 
     context = {
         "player": player,
+        "rounds": rounds_page,
         "rounds_page": rounds_page,
         "total_rounds": all_user_rounds.count(),
         "handicap_index": handicap_index,
