@@ -63,7 +63,8 @@
                 <div class="card shadow-sm">
                     <div class="card-header bg-dark text-white py-3">
                         <h5 class="mb-0 fw-bold">
-                            <i class="bi bi-calendar3 me-2"></i> Scoring History Log
+                            <i class="bi bi-calendar3 me-2"></i>  Scoring History Log for 
+                            {{ player.first_name|default:player.username|capfirst }}
                         </h5>
                     </div>
                     <div class="table-responsive">
@@ -112,7 +113,8 @@
     <div class="card bg-dark text-white border-secondary mb-4">
         <div class="card-header border-secondary d-flex justify-content-between align-items-center">
             <h5 class="mb-0 fw-bold">
-                <i class="bi bi-graph-up text-primary me-2"></i>Performance History
+                <i class="bi bi-graph-up text-primary me-2"></i>Performance Historyfor
+                {{ player.first_name|default:player.username|capfirst }}
             </h5>
             <small class="text-muted">Last 20 Rounds</small>
         </div>

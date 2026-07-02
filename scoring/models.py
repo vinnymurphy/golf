@@ -82,6 +82,13 @@ class Hole(models.Model):
 class Round(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     course = models.ForeignKey("Course", on_delete=models.CASCADE)
+    tee_set = models.ForeignKey(
+        "TeeSet",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="rounds",
+    )
     date = models.DateField(default=timezone.now)
     total_gross_score = models.IntegerField(default=0)
     completed_holes = models.IntegerField(default=18)
@@ -126,9 +133,7 @@ class Round(models.Model):
         # Scenario B: No HoleScores (CSV Import Fallback)
         else:
             gross = Decimal(str(self.total_gross_score))
-            # Find the TeeSet associated with this course.
-            # We use .first() as a safe default for historical data.
-            tee = self.course.tees.first()
+            tee = self.tee_set or self.course.tees.first()
 
         if not tee or gross == 0:
             return None
@@ -181,6 +186,8 @@ class Round(models.Model):
     def clean(self):
         if self.completed_holes < 9 or self.completed_holes > 18:
             raise ValidationError("Completed holes must be between 9 and 18")
+        if self.tee_set_id and self.course_id and self.tee_set.course_id != self.course_id:
+            raise ValidationError("Tee set must belong to the selected course")
 
 
 class HoleScoreManager(models.Manager):

@@ -2,12 +2,15 @@ import json
 
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.contrib import messages
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db import transaction
 from django.db.models import Avg, Min, Prefetch
 from django.forms import inlineformset_factory
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.dateparse import parse_date
 from django.views.generic import ListView
 
 from .forms import HoleScoreFormSet, RoundForm
@@ -24,6 +27,7 @@ RECENT_GLOBAL_ROUNDS = 8
 HANDICAP_DEFAULT_SORT_VALUE = 999.0
 HANDICAP_DEFAULT_DISPLAY = "N/A"
 PAGINATION_PAGE_SIZE = 20
+VALID_BULK_HOLE_COUNTS = {9, 18}
 
 
 # ============================================================================
@@ -186,6 +190,53 @@ def _build_course_leaderboard_data(course=None):
     leaderboard_data.sort(key=lambda x: _get_numeric_handicap(x["handicap"]))
 
     return leaderboard_data
+
+
+def _parse_positive_int(value):
+    if value in (None, ""):
+        return None
+
+    try:
+        parsed_value = int(value)
+    except (TypeError, ValueError):
+        return None
+
+    return parsed_value if parsed_value > 0 else None
+
+
+def _create_total_score_round(user, course, tee_set, played_on, score, holes_played):
+    round_obj = Round.objects.create(
+        user=user,
+        course=course,
+        tee_set=tee_set,
+        date=played_on,
+        total_gross_score=score,
+        completed_holes=holes_played,
+    )
+    round_obj.update_differential()
+    round_obj.save(update_fields=["total_gross_score", "completed_holes", "differential"])
+    return round_obj
+
+
+def _create_hole_score_round(user, course, tee_set, played_on, scores):
+    round_obj = Round.objects.create(
+        user=user,
+        course=course,
+        tee_set=tee_set,
+        date=played_on,
+        total_gross_score=sum(scores),
+        completed_holes=len(scores),
+    )
+    holes = list(tee_set.holes.order_by("hole_number")[: len(scores)])
+    HoleScore.objects.bulk_create(
+        [
+            HoleScore(round=round_obj, hole=hole, strokes=score)
+            for hole, score in zip(holes, scores)
+        ]
+    )
+    round_obj.update_differential()
+    round_obj.save(update_fields=["total_gross_score", "completed_holes", "differential"])
+    return round_obj
 
 
 # ============================================================================
@@ -441,6 +492,119 @@ def add_round(request):
         form = RoundForm()
 
     return render(request, "scoring/add_round.html", {"form": form})
+
+
+@login_required
+def bulk_add_rounds(request):
+    """
+    Create rounds for multiple players on the same course, tee set, and date.
+    """
+    courses = Course.objects.prefetch_related("tees__holes").all()
+    tee_sets = TeeSet.objects.select_related("course").prefetch_related("holes")
+    players = User.objects.order_by("first_name", "last_name", "username")
+
+    context = {
+        "courses": courses,
+        "tee_sets": tee_sets,
+        "players": players,
+        "hole_range": range(1, GOLF_HOLES + 1),
+    }
+
+    if request.method != "POST":
+        return render(request, "scoring/bulk_add_rounds.html", context)
+
+    course = Course.objects.filter(pk=request.POST.get("course")).first()
+    tee_set = TeeSet.objects.filter(pk=request.POST.get("tee_set")).first()
+    played_on_raw = request.POST.get("date")
+    played_on = parse_date(played_on_raw) if played_on_raw else None
+    entry_mode = request.POST.get("entry_mode")
+    selected_player_ids = request.POST.getlist("players")
+
+    context.update(
+        {
+            "selected_course_id": request.POST.get("course"),
+            "selected_tee_set_id": request.POST.get("tee_set"),
+            "selected_date": played_on_raw,
+            "selected_entry_mode": entry_mode,
+            "selected_player_ids": selected_player_ids,
+            "posted_data": request.POST,
+        }
+    )
+
+    errors = []
+    rounds_to_create = []
+
+    if not course:
+        errors.append("Choose a course.")
+    if not tee_set:
+        errors.append("Choose a tee color.")
+    elif course and tee_set.course_id != course.id:
+        errors.append("The selected tee color does not belong to that course.")
+    if entry_mode not in {"total", "holes"}:
+        errors.append("Choose total score or hole-by-hole entry.")
+    if played_on_raw and played_on is None:
+        errors.append("Enter a valid date.")
+    if not selected_player_ids:
+        errors.append("Choose at least one player.")
+
+    selected_players = list(User.objects.filter(id__in=selected_player_ids))
+    selected_players_by_id = {str(player.id): player for player in selected_players}
+
+    if tee_set:
+        available_holes = list(tee_set.holes.order_by("hole_number"))
+        if len(available_holes) < 9:
+            errors.append("The selected tee color needs at least 9 holes set up first.")
+
+    for player_id in selected_player_ids:
+        player = selected_players_by_id.get(player_id)
+        if not player:
+            errors.append("One of the selected players could not be found.")
+            continue
+
+        player_name = player.get_full_name() or player.username
+
+        if entry_mode == "total":
+            score = _parse_positive_int(request.POST.get(f"total_score_{player_id}"))
+            holes_played = _parse_positive_int(request.POST.get(f"holes_played_{player_id}"))
+
+            if score is None:
+                errors.append(f"Enter a total score for {player_name}.")
+                continue
+            if holes_played not in VALID_BULK_HOLE_COUNTS:
+                errors.append(f"Choose 9 or 18 holes for {player_name}.")
+                continue
+
+            rounds_to_create.append(("total", player, score, holes_played))
+
+        elif entry_mode == "holes":
+            scores = [
+                _parse_positive_int(request.POST.get(f"hole_{player_id}_{hole_number}"))
+                for hole_number in range(1, GOLF_HOLES + 1)
+            ]
+            scores = [score for score in scores if score is not None]
+
+            if len(scores) not in VALID_BULK_HOLE_COUNTS:
+                errors.append(f"Enter exactly 9 or 18 hole scores for {player_name}.")
+                continue
+
+            rounds_to_create.append(("holes", player, scores, len(scores)))
+
+    if errors:
+        for error in errors:
+            messages.error(request, error)
+        return render(request, "scoring/bulk_add_rounds.html", context)
+
+    with transaction.atomic():
+        for mode, player, score_data, holes_played in rounds_to_create:
+            if mode == "total":
+                _create_total_score_round(
+                    player, course, tee_set, played_on, score_data, holes_played
+                )
+            else:
+                _create_hole_score_round(player, course, tee_set, played_on, score_data)
+
+    messages.success(request, f"Posted {len(rounds_to_create)} round(s).")
+    return redirect("scoring:round_list")
 
 
 @login_required
