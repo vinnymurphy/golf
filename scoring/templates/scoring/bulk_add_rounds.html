@@ -6,7 +6,8 @@
             <h1 class="h3 mb-1">Bulk Score Entry</h1>
             <p class="text-muted mb-0">Post scores for everyone who played the same course and tee color.</p>
         </div>
-        <a href="{% url 'scoring:add_round' %}" class="btn btn-outline-secondary">Single Score</a>
+        <a href="{% url 'scoring:add_round' %}"
+           class="btn btn-outline-secondary">Single Score</a>
     </div>
     <form method="post" id="bulk-entry-form" novalidate>
         {% csrf_token %}
@@ -33,7 +34,8 @@
                                 <option value="{{ tee.id }}"
                                         data-course="{{ tee.course_id }}"
                                         {% if selected_tee_set_id == tee.id|stringformat:"s" %}selected{% endif %}>
-                                    {{ tee.color }}{% if tee.name and tee.name != tee.color %} - {{ tee.name }}{% endif %}
+                                    {{ tee.color }}
+                                    {% if tee.name and tee.name != tee.color %}- {{ tee.name }}{% endif %}
                                 </option>
                             {% endfor %}
                         </select>
@@ -81,9 +83,7 @@
                             <th>Player</th>
                             <th class="total-column text-nowrap">Total Score</th>
                             <th class="total-column text-nowrap">Holes</th>
-                            {% for hole_number in hole_range %}
-                                <th class="hole-column text-center">H{{ hole_number }}</th>
-                            {% endfor %}
+                            {% for hole_number in hole_range %}<th class="hole-column text-center">H{{ hole_number }}</th>{% endfor %}
                         </tr>
                     </thead>
                     <tbody>
@@ -98,9 +98,7 @@
                                            {% if player.id|stringformat:"s" in selected_player_ids %}checked{% endif %}>
                                 </td>
                                 <td>
-                                    <label for="player-{{ player.id }}" class="mb-0">
-                                        {{ player.get_full_name|default:player.username }}
-                                    </label>
+                                    <label for="player-{{ player.id }}" class="mb-0">{{ player.get_full_name|default:player.username }}</label>
                                 </td>
                                 <td class="total-column">
                                     <input type="number"

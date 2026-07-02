@@ -1,8 +1,8 @@
 import json
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.contrib import messages
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
@@ -214,7 +214,9 @@ def _create_total_score_round(user, course, tee_set, played_on, score, holes_pla
         completed_holes=holes_played,
     )
     round_obj.update_differential()
-    round_obj.save(update_fields=["total_gross_score", "completed_holes", "differential"])
+    round_obj.save(
+        update_fields=["total_gross_score", "completed_holes", "differential"]
+    )
     return round_obj
 
 
@@ -235,7 +237,9 @@ def _create_hole_score_round(user, course, tee_set, played_on, scores):
         ]
     )
     round_obj.update_differential()
-    round_obj.save(update_fields=["total_gross_score", "completed_holes", "differential"])
+    round_obj.save(
+        update_fields=["total_gross_score", "completed_holes", "differential"]
+    )
     return round_obj
 
 
@@ -565,7 +569,9 @@ def bulk_add_rounds(request):
 
         if entry_mode == "total":
             score = _parse_positive_int(request.POST.get(f"total_score_{player_id}"))
-            holes_played = _parse_positive_int(request.POST.get(f"holes_played_{player_id}"))
+            holes_played = _parse_positive_int(
+                request.POST.get(f"holes_played_{player_id}")
+            )
 
             if score is None:
                 errors.append(f"Enter a total score for {player_name}.")

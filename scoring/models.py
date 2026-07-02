@@ -186,7 +186,11 @@ class Round(models.Model):
     def clean(self):
         if self.completed_holes < 9 or self.completed_holes > 18:
             raise ValidationError("Completed holes must be between 9 and 18")
-        if self.tee_set_id and self.course_id and self.tee_set.course_id != self.course_id:
+        if (
+            self.tee_set_id
+            and self.course_id
+            and self.tee_set.course_id != self.course_id
+        ):
             raise ValidationError("Tee set must belong to the selected course")
 
 
