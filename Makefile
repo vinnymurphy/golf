@@ -49,7 +49,7 @@ test:
 	$(MANAGE) test -v 2 jobs
 
 shell:
-	$(MANAGE) shell
+	$(MANAGE) shell $(ARGS)
 
 clean:
 	find . -name "*.pyc" -delete
