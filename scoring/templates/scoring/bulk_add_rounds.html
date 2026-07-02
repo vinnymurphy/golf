@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block title %}Bulk Score Entry - BuddyScoring{% endblock %}
+{% block content %}
+    <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
+        <div>
+            <h1 class="h3 mb-1">Bulk Score Entry</h1>
+            <p class="text-muted mb-0">Post scores for everyone who played the same course and tee color.</p>
+        </div>
+        <a href="{% url 'scoring:add_round' %}"
+           class="btn btn-outline-secondary">Single Score</a>
+    </div>
+    <form method="post" id="bulk-entry-form" novalidate>
+        {% csrf_token %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label for="course-select" class="form-label">Course</label>
+                        <select class="form-select" id="course-select" name="course" required>
+                            <option value="">Choose a course</option>
+                            {% for course in courses %}
+                                <option value="{{ course.id }}"
+                                        {% if selected_course_id == course.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ course.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="tee-select" class="form-label">Tee Color</label>
+                        <select class="form-select" id="tee-select" name="tee_set" required>
+                            <option value="">Choose a tee color</option>
+                            {% for tee in tee_sets %}
+                                <option value="{{ tee.id }}"
+                                        data-course="{{ tee.course_id }}"
+                                        {% if selected_tee_set_id == tee.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ tee.color }}
+                                    {% if tee.name and tee.name != tee.color %}- {{ tee.name }}{% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="date-input" class="form-label">Date Played</label>
+                        <input type="date"
+                               class="form-control"
+                               id="date-input"
+                               name="date"
+                               value="{{ selected_date }}">
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <label class="form-label d-block">Score Format</label>
+                    <div class="btn-group" role="group" aria-label="Score format">
+                        <input type="radio"
+                               class="btn-check"
+                               name="entry_mode"
+                               id="mode-total"
+                               value="total"
+                               {% if selected_entry_mode != "holes" %}checked{% endif %}>
+                        <label class="btn btn-outline-success" for="mode-total">Total Score</label>
+                        <input type="radio"
+                               class="btn-check"
+                               name="entry_mode"
+                               id="mode-holes"
+                               value="holes"
+                               {% if selected_entry_mode == "holes" %}checked{% endif %}>
+                        <label class="btn btn-outline-success" for="mode-holes">Hole by Hole</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0">Players</h2>
+                <button type="submit" class="btn btn-success btn-sm">Post Scores</button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-nowrap">Played</th>
+                            <th>Player</th>
+                            <th class="total-column text-nowrap">Total Score</th>
+                            <th class="total-column text-nowrap">Holes</th>
+                            {% for hole_number in hole_range %}<th class="hole-column text-center">H{{ hole_number }}</th>{% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for player in players %}
+                            <tr>
+                                <td>
+                                    <input class="form-check-input player-check"
+                                           type="checkbox"
+                                           name="players"
+                                           value="{{ player.id }}"
+                                           id="player-{{ player.id }}"
+                                           {% if player.id|stringformat:"s" in selected_player_ids %}checked{% endif %}>
+                                </td>
+                                <td>
+                                    <label for="player-{{ player.id }}" class="mb-0">{{ player.get_full_name|default:player.username }}</label>
+                                </td>
+                                <td class="total-column">
+                                    <input type="number"
+                                           class="form-control form-control-sm score-input"
+                                           name="total_score_{{ player.id }}"
+                                           min="1"
+                                           inputmode="numeric">
+                                </td>
+                                <td class="total-column">
+                                    <select class="form-select form-select-sm score-input"
+                                            name="holes_played_{{ player.id }}">
+                                        <option value="">-</option>
+                                        <option value="9">9</option>
+                                        <option value="18" selected>18</option>
+                                    </select>
+                                </td>
+                                {% for hole_number in hole_range %}
+                                    <td class="hole-column">
+                                        <input type="number"
+                                               class="form-control form-control-sm text-center score-input hole-score-input"
+                                               name="hole_{{ player.id }}_{{ hole_number }}"
+                                               min="1"
+                                               inputmode="numeric"
+                                               aria-label="{{ player.username }} hole {{ hole_number }}">
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="22" class="text-center text-muted py-4">No players exist yet.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer d-flex justify-content-end">
+                <button type="submit" class="btn btn-success">Post Scores</button>
+            </div>
+        </div>
+    </form>
+    <script>
+        const courseSelect = document.getElementById('course-select');
+        const teeSelect = document.getElementById('tee-select');
+        const totalMode = document.getElementById('mode-total');
+        const holeMode = document.getElementById('mode-holes');
+        const totalColumns = document.querySelectorAll('.total-column');
+        const holeColumns = document.querySelectorAll('.hole-column');
+
+        function filterTees() {
+            const selectedCourse = courseSelect.value;
+            let selectedOptionVisible = false;
+
+            Array.from(teeSelect.options).forEach((option) => {
+                if (!option.value) {
+                    option.hidden = false;
+                    return;
+                }
+
+                const isVisible = option.dataset.course === selectedCourse;
+                option.hidden = !isVisible;
+
+                if (option.selected && isVisible) {
+                    selectedOptionVisible = true;
+                }
+            });
+
+            if (!selectedOptionVisible) {
+                teeSelect.value = '';
+            }
+        }
+
+        function syncMode() {
+            const isHoleMode = holeMode.checked;
+            totalColumns.forEach((column) => column.classList.toggle('d-none', isHoleMode));
+            holeColumns.forEach((column) => column.classList.toggle('d-none', !isHoleMode));
+        }
+
+        courseSelect.addEventListener('change', filterTees);
+        totalMode.addEventListener('change', syncMode);
+        holeMode.addEventListener('change', syncMode);
+        filterTees();
+        syncMode();
+    </script>
+{% endblock %}
