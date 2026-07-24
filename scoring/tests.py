@@ -1,7 +1,9 @@
 import json
+import tempfile
 from datetime import date, timedelta
 
 from django.contrib.auth.models import User
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
@@ -135,3 +137,35 @@ class BulkRoundEntryTests(TestCase):
         self.assertEqual(round_obj.total_gross_score, 36)
         self.assertEqual(round_obj.completed_holes, 9)
         self.assertEqual(HoleScore.objects.filter(round=round_obj).count(), 9)
+
+
+class ImportJsonTests(TestCase):
+    def test_total_score_only_nine_hole_round_uses_named_tee_for_differential(self):
+        course = Course.objects.create(name="Rochester Golf Club")
+        tee_set = TeeSet.objects.create(
+            course=course,
+            name="White",
+            color="White",
+            rating="72.0",
+            slope=113,
+        )
+        data = [
+            {
+                "username": "john",
+                "course": course.name,
+                "date": "2026-07-24",
+                "total_gross_score": 37,
+                "completed_holes": 9,
+                "hole_scores": [],
+                "tee_set_name": tee_set.name,
+            }
+        ]
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as json_file:
+            json.dump(data, json_file)
+            json_file.flush()
+            call_command("import_json", json_file.name)
+
+        round_obj = Round.objects.get(user__username="john")
+        self.assertEqual(round_obj.tee_set, tee_set)
+        self.assertEqual(round_obj.differential, 1)
