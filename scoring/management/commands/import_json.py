@@ -153,11 +153,19 @@ class Command(BaseCommand):
                 f"Course '{entry['course']}' not found in database"
             ) from exc
 
+        # Resolve the tee set even when this is a total-score-only import.  The
+        # differential calculation needs its rating and slope; previously we
+        # only did this while importing individual hole scores.
+        tee_set = None
+        if entry.get("tee_set_name"):
+            tee_set = self._get_tee_set(course, entry["tee_set_name"], verbose)
+
         # Create the Round
         try:
             new_round = Round.objects.create(
                 user=user,
                 course=course,
+                tee_set=tee_set,
                 date=entry["date"],
                 total_gross_score=entry["total_gross_score"],
                 completed_holes=entry["completed_holes"],
@@ -167,37 +175,36 @@ class Command(BaseCommand):
         except Exception as e:
             raise ValueError(f"Failed to create round for {username}: {e}") from e
 
-        # Add Hole Scores if they exist, then recalculate differential
+        # Add Hole Scores if they exist, then calculate the differential. This
+        # also covers total-score-only imports, which have no HoleScore rows.
         if entry.get("hole_scores"):
             self._import_hole_scores(new_round, entry, verbose)
-            new_round.update_differential()
-            new_round.save()
+        new_round.update_differential()
+        new_round.save(update_fields=["total_gross_score", "differential"])
+
+    def _get_tee_set(self, course, tee_set_name, verbose=False):
+        """Find a tee set by its name, falling back to its color."""
+        try:
+            return TeeSet.objects.get(course=course, name=tee_set_name)
+        except TeeSet.DoesNotExist:
+            try:
+                tee_set = TeeSet.objects.get(course=course, color=tee_set_name)
+                if verbose:
+                    logger.info(f"Matched tee_set_name '{tee_set_name}' by color")
+                return tee_set
+            except TeeSet.DoesNotExist as exc:
+                raise ValueError(
+                    f"Tee set '{tee_set_name}' not found for course '{course.name}' "
+                    f"(checked both 'name' and 'color' fields)"
+                ) from exc
 
     def _import_hole_scores(self, round_obj, entry, verbose=False):
         """Import hole scores for a round."""
         hole_scores = entry["hole_scores"]
 
-        # Try to get TeeSet by name first, then by color as fallback
-        tee_set = None
-        try:
-            tee_set = TeeSet.objects.get(
-                course=round_obj.course, name=entry["tee_set_name"]
-            )
-        except TeeSet.DoesNotExist:
-            # Fallback: try to match by color
-            try:
-                tee_set = TeeSet.objects.get(
-                    course=round_obj.course, color=entry["tee_set_name"]
-                )
-                if verbose:
-                    logger.info(
-                        f"Matched tee_set_name '{entry['tee_set_name']}' by color"
-                    )
-            except TeeSet.DoesNotExist as e:
-                raise ValueError(
-                    f"Tee set '{entry['tee_set_name']}' not found for course '{round_obj.course.name}' "
-                    f"(checked both 'name' and 'color' fields)"
-                ) from e
+        tee_set = round_obj.tee_set or self._get_tee_set(
+            round_obj.course, entry["tee_set_name"], verbose
+        )
 
         # Fetch holes in order
         holes = list(
