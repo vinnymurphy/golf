@@ -189,6 +189,13 @@
                 }
             },
             plugins: {
+                title: {
+                    display: true,
+                    text: 'Performance History for {{ player.first_name|default:player.username|capfirst|escapejs }}',
+                    color: '#fff',
+                    font: { size: 18, weight: 'bold' },
+                    padding: { bottom: 16 }
+                },
                 legend: {
                     labels: { color: '#fff' }
                 }
