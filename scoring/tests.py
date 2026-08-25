@@ -66,6 +66,41 @@ class PlayerProfileViewTests(TestCase):
 
         self.assertEqual(handicaps, [None, None, 18.0, 9.0])
 
+    def test_profile_includes_9_hole_score_distribution(self):
+        user = User.objects.create_user(username="vinny", password="unused")
+        course = Course.objects.create(name="Pine Valley")
+        for score in (80, 82, 82, 84):
+            Round.objects.create(
+                user=user,
+                course=course,
+                total_gross_score=score,
+                completed_holes=9,
+            )
+        Round.objects.create(
+            user=user,
+            course=course,
+            total_gross_score=40,
+            completed_holes=18,
+        )
+
+        response = self.client.get(
+            reverse("scoring:player_profile", kwargs={"username": user.username})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["score_distribution_round_count"], 4)
+        labels = json.loads(response.context["score_distribution_labels_json"])
+        counts = json.loads(response.context["score_distribution_counts_json"])
+        deviations = json.loads(response.context["score_distribution_deviations_json"])
+        self.assertEqual(counts[labels.index(80)], 1)
+        self.assertEqual(counts[labels.index(82)], 2)
+        self.assertEqual(counts[labels.index(84)], 1)
+        self.assertEqual(
+            [marker["standard_deviations"] for marker in deviations],
+            [1, 1, 2, 2, 3, 3],
+        )
+        self.assertContains(response, "Score Distribution")
+
 
 class BulkRoundEntryTests(TestCase):
     def setUp(self):

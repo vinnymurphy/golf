@@ -1,4 +1,5 @@
 import json
+from math import ceil, exp, floor, pi, sqrt
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -83,6 +84,59 @@ def _build_player_chart_data(player, recent_rounds):
             chart_handicaps.append(None)
 
     return chart_dates, chart_scores, chart_handicaps
+
+
+def _build_score_distribution_data(scores):
+    """Build histogram and normal-distribution data for a player's scores.
+
+    The normal curve is scaled to the number of rounds, allowing it to share
+    the count axis with the score-frequency bars.
+    """
+    if not scores:
+        return [], [], [], [], None, None
+
+    mean = sum(scores) / len(scores)
+    variance = sum((score - mean) ** 2 for score in scores) / len(scores)
+    standard_deviation = sqrt(variance)
+
+    # Include enough range on either side of the average to make the shape of
+    # the curve readable, while retaining every score in the histogram.
+    curve_padding = max(3, standard_deviation * 3)
+    low_score = min(min(scores), floor(mean - curve_padding))
+    high_score = max(max(scores), ceil(mean + curve_padding))
+    labels = list(range(low_score, high_score + 1))
+    frequencies = [scores.count(score) for score in labels]
+
+    if standard_deviation == 0:
+        curve = [len(scores) if score == round(mean) else 0 for score in labels]
+    else:
+        scale = len(scores)
+        curve = [
+            round(
+                scale
+                * (1 / (standard_deviation * sqrt(2 * pi)))
+                * exp(-0.5 * ((score - mean) / standard_deviation) ** 2),
+                2,
+            )
+            for score in labels
+        ]
+
+    deviations = [
+        {
+            "standard_deviations": multiplier,
+            "score": round(mean + direction * multiplier * standard_deviation, 1),
+        }
+        for multiplier in range(1, 4)
+        for direction in (-1, 1)
+    ]
+    return (
+        labels,
+        frequencies,
+        curve,
+        deviations,
+        round(mean, 1),
+        round(standard_deviation, 1),
+    )
 
 
 def _calculate_form_trend(recent_rounds, handicap_index):
@@ -304,6 +358,20 @@ def player_profile(request, username):
         player, recent_rounds_list
     )
 
+    distribution_scores = list(
+        all_user_rounds.filter(completed_holes=9, total_gross_score__gt=0).values_list(
+            "total_gross_score", flat=True
+        )
+    )
+    (
+        score_distribution_labels,
+        score_distribution_counts,
+        score_distribution_curve,
+        score_distribution_deviations,
+        score_distribution_mean,
+        score_distribution_stddev,
+    ) = _build_score_distribution_data(distribution_scores)
+
     # Calculate overall handicap
     handicap_result = calculate_handicap(player)
     handicap_index = handicap_result.index
@@ -344,6 +412,21 @@ def player_profile(request, username):
         "chart_dates_json": json.dumps(chart_dates, cls=DjangoJSONEncoder),
         "chart_scores_json": json.dumps(chart_scores, cls=DjangoJSONEncoder),
         "chart_handicaps_json": json.dumps(chart_handicaps, cls=DjangoJSONEncoder),
+        "score_distribution_labels_json": json.dumps(
+            score_distribution_labels, cls=DjangoJSONEncoder
+        ),
+        "score_distribution_counts_json": json.dumps(
+            score_distribution_counts, cls=DjangoJSONEncoder
+        ),
+        "score_distribution_curve_json": json.dumps(
+            score_distribution_curve, cls=DjangoJSONEncoder
+        ),
+        "score_distribution_deviations_json": json.dumps(
+            score_distribution_deviations, cls=DjangoJSONEncoder
+        ),
+        "score_distribution_round_count": len(distribution_scores),
+        "score_distribution_mean": score_distribution_mean,
+        "score_distribution_stddev": score_distribution_stddev,
     }
 
     return render(request, "scoring/player_profile.html", context)
