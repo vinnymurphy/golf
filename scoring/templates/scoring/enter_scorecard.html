@@ -22,7 +22,15 @@
     <h3>Back 9</h3>
     <div class="scorecard-grid">
         <div class="grid-item header">Hole</div>
-        {% for i in "10,11,12,13,14,15,16,17,18"|split:"," %}<div class="grid-item header">{{ i }}</div>{% endfor %}
+        <div class="grid-item header">10</div>
+        <div class="grid-item header">11</div>
+        <div class="grid-item header">12</div>
+        <div class="grid-item header">13</div>
+        <div class="grid-item header">14</div>
+        <div class="grid-item header">15</div>
+        <div class="grid-item header">16</div>
+        <div class="grid-item header">17</div>
+        <div class="grid-item header">18</div>
         <div class="grid-item header">Score</div>
         {% for form in formset|slice:"9:18" %}<div class="grid-item">{{ form.strokes }}</div>{% endfor %}
     </div>

@@ -8,5 +8,5 @@ remaining cleanup safe to schedule separately.
 | --- | --- | --- | --- |
 | `setup_course_holes` | `Course.tee_sets` | `TeeSet.course` defines `related_name="tees"`, exposed as `Course.tees` | Fixed in this change. |
 | `setup_course_holes` POST redirect | `scoring:course_detail` | No `course_detail` URL is registered | Fixed by returning to the configured course's setup page. |
-| `start_round.html` | `scoring:enter_scorecard` with no arguments | `enter_scorecard` requires `course_id` | Unresolved; the form action and view signature need to be aligned. |
-| `enter_scores` | `Hole.course` and `Hole.yardages` | `Hole` belongs to `tee_set` and has a direct `yardage` field | Unresolved; this view reflects an older hole data model. |
+| `start_round.html` | `scoring:enter_scorecard` with no arguments | `enter_scorecard` requires `course_id` | Fixed by constructing the scorecard URL from the selected course. |
+| `enter_scores` | `Hole.course` and `Hole.yardages` | `Hole` belongs to `tee_set` and has a direct `yardage` field | Fixed by retrieving holes through the round's tee set and rendering `Hole.yardage`. |

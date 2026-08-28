@@ -733,11 +733,11 @@ def enter_scores(request, round_id):
     Only the round's owner can edit it.
     """
     round_obj = get_object_or_404(Round, pk=round_id, user=request.user)
-    holes = Hole.objects.filter(course=round_obj.course).order_by("hole_number")
-
-    # Fetch yardage for each hole in the round's tee set
-    for hole in holes:
-        hole.current_yardage = hole.yardages.filter(tee_set=round_obj.tee_set).first()
+    holes = (
+        round_obj.tee_set.holes.order_by("hole_number")
+        if round_obj.tee_set_id
+        else Hole.objects.none()
+    )
 
     if request.method == "POST":
         formset = HoleScoreFormSet(request.POST, instance=round_obj)

@@ -49,7 +49,7 @@ urlpatterns = [
     path("rounds/add/", views.add_round, name="add_round"),
     path("rounds/bulk-add/", views.bulk_add_rounds, name="bulk_add_rounds"),
     path("rounds/<int:round_id>/", views.round_detail, name="round_detail"),
-    path("rounds/<int:round_id>/start/", views.start_round, name="start_round"),
+    path("rounds/start/", views.start_round, name="start_round"),
     path("rounds/<int:round_id>/scores/", views.enter_scores, name="enter_scores"),
     # ========== COURSES & SETUP ==========
     path(
