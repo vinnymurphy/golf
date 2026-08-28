@@ -2,10 +2,12 @@ import csv
 import logging
 from datetime import datetime
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
 from scoring.models import Course, Round, TeeSet
+
+UserModel = get_user_model()
 
 
 class Command(BaseCommand):
@@ -28,8 +30,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         try:
-            user = User.objects.get(username=options["user"])
-        except User.DoesNotExist as e:
+            user = UserModel.objects.get(username=options["user"])
+        except UserModel.DoesNotExist as e:
             raise CommandError(f"User '{options['user']}' not found") from e
 
         required_fields = {"course name", "date", "gross score"}

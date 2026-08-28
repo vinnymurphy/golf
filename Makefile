@@ -46,7 +46,7 @@ handicap:
 
 
 test:
-	$(MANAGE) test -v 2 jobs
+	$(MANAGE) test -v 2 scoring
 
 shell:
 	$(MANAGE) shell $(ARGS)

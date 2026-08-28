@@ -1,8 +1,9 @@
 import json
+from math import ceil, exp, floor, pi, sqrt
 
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
@@ -16,6 +17,8 @@ from django.views.generic import ListView
 from .forms import HoleScoreFormSet, RoundForm
 from .models import Course, Hole, HoleScore, Round, TeeSet
 from .utils import calculate_handicap
+
+UserModel = get_user_model()
 
 # ============================================================================
 # Constants
@@ -85,19 +88,72 @@ def _build_player_chart_data(player, recent_rounds):
     return chart_dates, chart_scores, chart_handicaps
 
 
+def _build_score_distribution_data(scores):
+    """Build histogram and normal-distribution data for a player's scores.
+
+    The normal curve is scaled to the number of rounds, allowing it to share
+    the count axis with the score-frequency bars.
+    """
+    if not scores:
+        return [], [], [], [], None, None
+
+    mean = sum(scores) / len(scores)
+    variance = sum((score - mean) ** 2 for score in scores) / len(scores)
+    standard_deviation = sqrt(variance)
+
+    # Include enough range on either side of the average to make the shape of
+    # the curve readable, while retaining every score in the histogram.
+    curve_padding = max(3, standard_deviation * 3)
+    low_score = min(min(scores), floor(mean - curve_padding))
+    high_score = max(max(scores), ceil(mean + curve_padding))
+    labels = list(range(low_score, high_score + 1))
+    frequencies = [scores.count(score) for score in labels]
+
+    if standard_deviation == 0:
+        curve = [len(scores) if score == round(mean) else 0 for score in labels]
+    else:
+        scale = len(scores)
+        curve = [
+            round(
+                scale
+                * (1 / (standard_deviation * sqrt(2 * pi)))
+                * exp(-0.5 * ((score - mean) / standard_deviation) ** 2),
+                2,
+            )
+            for score in labels
+        ]
+
+    deviations = [
+        {
+            "standard_deviations": multiplier,
+            "score": round(mean + direction * multiplier * standard_deviation, 1),
+        }
+        for multiplier in range(1, 4)
+        for direction in (-1, 1)
+    ]
+    return (
+        labels,
+        frequencies,
+        curve,
+        deviations,
+        round(mean, 1),
+        round(standard_deviation, 1),
+    )
+
+
 def _calculate_form_trend(recent_rounds, handicap_index):
     """Calculate form trend (average of recent rounds vs overall
     handicap).
 
     Args:
-        recent_rounds: QuerySet of recent Round objects
+        recent_rounds: Iterable of recent Round objects
         handicap_index: Player's current handicap index (float or None)
 
     Returns:
         float or None: Trend metric or None if not enough rounds
 
     """
-    if recent_rounds.count() < RECENT_ROUNDS_TREND:
+    if len(recent_rounds) < RECENT_ROUNDS_TREND:
         return None
 
     valid_differentials = [
@@ -161,7 +217,7 @@ def _build_course_leaderboard_data(course=None):
 
     # Optimize: use Prefetch with select_related to reduce queries
     round_queryset = Round.objects.select_related("course").order_by("-date")
-    buddies = User.objects.filter(id__in=player_ids).prefetch_related(
+    buddies = UserModel.objects.filter(id__in=player_ids).prefetch_related(
         Prefetch("round_set", queryset=round_queryset)
     )
 
@@ -289,20 +345,37 @@ def player_profile(request, username):
 
     Optimized with efficient queries and pagination for large datasets.
     """
-    player = get_object_or_404(User, username=username)
+    player = get_object_or_404(UserModel, username=username)
     all_user_rounds = Round.objects.filter(user=player).select_related("course")
+
+    # Paginator caches the queryset count, which we can reuse for both the
+    # profile summary and the recent-round chart slice.
+    paginator = Paginator(all_user_rounds.order_by("-date"), PAGINATION_PAGE_SIZE)
+    total_rounds = paginator.count
 
     # Get recent rounds for chart (ordered by date ascending)
     recent_rounds_list = list(
-        all_user_rounds.order_by("date")[
-            max(0, all_user_rounds.count() - RECENT_ROUNDS_DISPLAY) :
-        ]
+        all_user_rounds.order_by("date")[max(0, total_rounds - RECENT_ROUNDS_DISPLAY) :]
     )
 
     # Build chart data
     chart_dates, chart_scores, chart_handicaps = _build_player_chart_data(
         player, recent_rounds_list
     )
+
+    distribution_scores = list(
+        all_user_rounds.filter(completed_holes=9, total_gross_score__gt=0).values_list(
+            "total_gross_score", flat=True
+        )
+    )
+    (
+        score_distribution_labels,
+        score_distribution_counts,
+        score_distribution_curve,
+        score_distribution_deviations,
+        score_distribution_mean,
+        score_distribution_stddev,
+    ) = _build_score_distribution_data(distribution_scores)
 
     # Calculate overall handicap
     handicap_result = calculate_handicap(player)
@@ -317,11 +390,10 @@ def player_profile(request, username):
     )
 
     # Calculate form trend (last 3 rounds)
-    recent_3_rounds = all_user_rounds.order_by("-date")[:RECENT_ROUNDS_TREND]
+    recent_3_rounds = list(all_user_rounds.order_by("-date")[:RECENT_ROUNDS_TREND])
     trend_metric = _calculate_form_trend(recent_3_rounds, handicap_index)
 
     # Paginate all rounds for the rounds list
-    paginator = Paginator(all_user_rounds.order_by("-date"), PAGINATION_PAGE_SIZE)
     page_number = request.GET.get("page")
     try:
         rounds_page = paginator.page(page_number)
@@ -334,7 +406,7 @@ def player_profile(request, username):
         "player": player,
         "rounds": rounds_page,
         "rounds_page": rounds_page,
-        "total_rounds": all_user_rounds.count(),
+        "total_rounds": total_rounds,
         "handicap_index": handicap_index,
         "counting_ids": counting_ids,
         "low_score": stats["low_score"],
@@ -344,6 +416,21 @@ def player_profile(request, username):
         "chart_dates_json": json.dumps(chart_dates, cls=DjangoJSONEncoder),
         "chart_scores_json": json.dumps(chart_scores, cls=DjangoJSONEncoder),
         "chart_handicaps_json": json.dumps(chart_handicaps, cls=DjangoJSONEncoder),
+        "score_distribution_labels_json": json.dumps(
+            score_distribution_labels, cls=DjangoJSONEncoder
+        ),
+        "score_distribution_counts_json": json.dumps(
+            score_distribution_counts, cls=DjangoJSONEncoder
+        ),
+        "score_distribution_curve_json": json.dumps(
+            score_distribution_curve, cls=DjangoJSONEncoder
+        ),
+        "score_distribution_deviations_json": json.dumps(
+            score_distribution_deviations, cls=DjangoJSONEncoder
+        ),
+        "score_distribution_round_count": len(distribution_scores),
+        "score_distribution_mean": score_distribution_mean,
+        "score_distribution_stddev": score_distribution_stddev,
     }
 
     return render(request, "scoring/player_profile.html", context)
@@ -387,23 +474,49 @@ def setup_course_holes(request, course_id):
     Setup hole details (par, yardage) for a course's tee sets.
     """
     course = get_object_or_404(Course, pk=course_id)
-    tee_sets = course.tee_sets.all()
+    tee_sets = course.tees.all()
     hole_range = range(1, GOLF_HOLES + 1)
 
     if request.method == "POST":
+        hole_data = []
         for hole_number in hole_range:
-            par_value = request.POST.get(f"par_{hole_number}")
-
-            for tee in tee_sets:
-                yardage_value = request.POST.get(f"yardage_{tee.id}_{hole_number}")
-
-                Hole.objects.update_or_create(
-                    tee_set=tee,
-                    hole_number=hole_number,
-                    defaults={"par": par_value, "yardage": yardage_value},
+            par_value = _parse_positive_int(request.POST.get(f"par_{hole_number}"))
+            if par_value not in {3, 4, 5}:
+                messages.error(request, f"Hole {hole_number} par must be 3, 4, or 5.")
+                return render(
+                    request,
+                    "scoring/setup_holes_grid.html",
+                    {"course": course, "tee_sets": tee_sets, "hole_range": hole_range},
                 )
 
-        return redirect("scoring:course_detail", course_id=course.id)
+            for tee in tee_sets:
+                yardage_value = _parse_positive_int(
+                    request.POST.get(f"yardage_{tee.id}_{hole_number}")
+                )
+                if yardage_value is None:
+                    messages.error(
+                        request,
+                        f"Enter a positive yardage for {tee.color}, hole {hole_number}.",
+                    )
+                    return render(
+                        request,
+                        "scoring/setup_holes_grid.html",
+                        {
+                            "course": course,
+                            "tee_sets": tee_sets,
+                            "hole_range": hole_range,
+                        },
+                    )
+                hole_data.append((tee, hole_number, par_value, yardage_value))
+
+        for tee, hole_number, par_value, yardage_value in hole_data:
+            Hole.objects.update_or_create(
+                tee_set=tee,
+                hole_number=hole_number,
+                defaults={"par": par_value, "yardage": yardage_value},
+            )
+
+        return redirect("scoring:setup_holes", course_id=course.id)
 
     return render(
         request,
@@ -505,7 +618,7 @@ def bulk_add_rounds(request):
     """
     courses = Course.objects.prefetch_related("tees__holes").all()
     tee_sets = TeeSet.objects.select_related("course").prefetch_related("holes")
-    players = User.objects.order_by("first_name", "last_name", "username")
+    players = UserModel.objects.order_by("first_name", "last_name", "username")
 
     context = {
         "courses": courses,
@@ -551,7 +664,7 @@ def bulk_add_rounds(request):
     if not selected_player_ids:
         errors.append("Choose at least one player.")
 
-    selected_players = list(User.objects.filter(id__in=selected_player_ids))
+    selected_players = list(UserModel.objects.filter(id__in=selected_player_ids))
     selected_players_by_id = {str(player.id): player for player in selected_players}
 
     if tee_set:

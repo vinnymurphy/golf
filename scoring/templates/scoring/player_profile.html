@@ -110,7 +110,7 @@
             </div>
         </div>
     </div>
-    <div class="card bg-dark text-white border-secondary mb-4">
+    <div class="card bg-dark text-white border-secondary mt-4 mb-4">
         <div class="card-header border-secondary d-flex justify-content-between align-items-center">
             <h5 class="mb-0 fw-bold">
                 <i class="bi bi-graph-up text-primary me-2"></i>Performance History for
@@ -122,6 +122,31 @@
             <div style="position: relative; height:300px; width:100%;">
                 <canvas id="performanceChart"></canvas>
             </div>
+        </div>
+    </div>
+    <div class="card shadow-sm mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 fw-bold"><i class="bi bi-bar-chart-fill text-primary me-2"></i>Score Distribution</h5>
+            <small class="text-muted">9-hole rounds only</small>
+        </div>
+        <div class="card-body">
+            {% if score_distribution_round_count %}
+                <div class="d-flex gap-3 small text-muted mb-3">
+                    <span>{{ score_distribution_round_count }} rounds</span>
+                    <span>Average {{ score_distribution_mean }}</span>
+                    <span>Std. dev. {{ score_distribution_stddev }}</span>
+                </div>
+                <div class="d-flex flex-wrap gap-3 small mb-3">
+                    <span class="text-warning">-- ±1σ</span>
+                    <span style="color: #fd7e14;">-- ±2σ</span>
+                    <span class="text-danger">-- ±3σ</span>
+                </div>
+                <div style="position: relative; height:280px; width:100%;">
+                    <canvas id="scoreDistributionChart"></canvas>
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">Add a 9-hole round to see this player's score distribution.</p>
+            {% endif %}
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -202,5 +227,79 @@
             }
         }
     });
+
+    const distributionCanvas = document.getElementById('scoreDistributionChart');
+    if (distributionCanvas) {
+        const distributionLabels = {{ score_distribution_labels_json|safe }};
+        const deviationMarkers = {{ score_distribution_deviations_json|safe }};
+        const deviationColors = {
+            1: '#ffc107',
+            2: '#fd7e14',
+            3: '#dc3545'
+        };
+        const deviationPlugin = {
+            id: 'deviationMarkers',
+            afterDatasetsDraw(chart) {
+                const {ctx, chartArea, scales: {x}} = chart;
+                const firstScore = distributionLabels[0];
+
+                ctx.save();
+                deviationMarkers.forEach(({standard_deviations, score}) => {
+                    const position = score - firstScore;
+                    const xPosition = x.getPixelForValue(position);
+                    if (xPosition < chartArea.left || xPosition > chartArea.right) return;
+
+                    ctx.beginPath();
+                    ctx.setLineDash([6, 4]);
+                    ctx.strokeStyle = deviationColors[standard_deviations];
+                    ctx.lineWidth = 1.5;
+                    ctx.moveTo(xPosition, chartArea.top);
+                    ctx.lineTo(xPosition, chartArea.bottom);
+                    ctx.stroke();
+                });
+                ctx.restore();
+            }
+        };
+        new Chart(distributionCanvas.getContext('2d'), {
+            data: {
+                labels: {{ score_distribution_labels_json|safe }},
+                datasets: [
+                    {
+                        type: 'bar',
+                        label: 'Rounds played',
+                        data: {{ score_distribution_counts_json|safe }},
+                        backgroundColor: 'rgba(13, 110, 253, 0.55)',
+                        borderColor: '#0d6efd',
+                        borderWidth: 1,
+                        borderRadius: 3
+                    },
+                    {
+                        type: 'line',
+                        label: 'Bell curve',
+                        data: {{ score_distribution_curve_json|safe }},
+                        borderColor: '#dc3545',
+                        backgroundColor: 'rgba(220, 53, 69, 0.08)',
+                        borderWidth: 3,
+                        pointRadius: 0,
+                        tension: 0.35,
+                        fill: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { title: { display: true, text: 'Gross score' } },
+                    y: { beginAtZero: true, title: { display: true, text: 'Number of rounds' }, ticks: { precision: 0 } }
+                },
+                plugins: {
+                    tooltip: { mode: 'index', intersect: false },
+                    legend: { position: 'top' }
+                }
+            },
+            plugins: [deviationPlugin]
+        });
+    }
     </script>
 {% endblock %}
