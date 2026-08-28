@@ -66,6 +66,42 @@ class StartRoundViewTests(TestCase):
         self.assertContains(response, "Post Scorecard")
 
 
+class EnterScoresViewTests(TestCase):
+    def test_scores_page_uses_holes_and_yardages_from_round_tee_set(self):
+        user = UserModel.objects.create_user(username="golfer", password="unused")
+        course = Course.objects.create(name="Pine Valley")
+        white_tees = TeeSet.objects.create(
+            course=course,
+            name="White",
+            color="White",
+            rating="72.0",
+            slope=113,
+        )
+        blue_tees = TeeSet.objects.create(
+            course=course,
+            name="Blue",
+            color="Blue",
+            rating="70.0",
+            slope=120,
+        )
+        Hole.objects.create(tee_set=white_tees, hole_number=1, par=4, yardage=321)
+        Hole.objects.create(tee_set=blue_tees, hole_number=1, par=4, yardage=451)
+        round_obj = Round.objects.create(
+            user=user,
+            course=course,
+            tee_set=white_tees,
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(
+            reverse("scoring:enter_scores", kwargs={"round_id": round_obj.id})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "321")
+        self.assertNotContains(response, "451")
+
+
 class PlayerProfileViewTests(TestCase):
     def test_profile_chart_shows_historical_handicaps(self):
         user = UserModel.objects.create_user(
