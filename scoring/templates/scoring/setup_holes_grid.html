@@ -1,0 +1,33 @@
+<form method="post">
+    {% csrf_token %}
+    <h2>Hole Details for {{ course.name }}</h2>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Hole</th>
+                <th>Par</th>
+                {% for tee in tee_sets %}<th style="color: {{ tee.color|lower }};">{{ tee.color }} Yardage</th>{% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for n in hole_range %}
+                <tr>
+                    <td>
+                        <strong>{{ n }}</strong>
+                    </td>
+                    <td>
+                        <input type="number" name="par_{{ n }}" value="4" class="form-control">
+                    </td>
+                    {% for tee in tee_sets %}
+                        <td>
+                            <input type="number"
+                                   name="yardage_{{ tee.id }}_{{ n }}"
+                                   class="form-control">
+                        </td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button type="submit" class="btn btn-success">Save All Holes</button>
+</form>

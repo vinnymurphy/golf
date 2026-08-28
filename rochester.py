@@ -42,6 +42,8 @@ if __name__ == "__main__":
     output_path = Path("data/imports") / f"{played_on}.json"
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    json_data.sort(key=lambda round_data: round_data.get("username", "").casefold())
+
     with output_path.open("w", encoding="utf-8") as output_file:
         json.dump(json_data, output_file, indent=2, sort_keys=True)
 

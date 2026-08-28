@@ -1,10 +1,12 @@
 from decimal import Decimal
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
 from scoring.models import Round
 from scoring.utils import calculate_handicap
+
+UserModel = get_user_model()
 
 
 class Command(BaseCommand):
@@ -25,7 +27,9 @@ class Command(BaseCommand):
         recalc = options.get("recalc_differentials", False)
 
         users = (
-            User.objects.filter(username=username) if username else User.objects.all()
+            UserModel.objects.filter(username=username)
+            if username
+            else UserModel.objects.all()
         )
         total_recalculated = 0
 
