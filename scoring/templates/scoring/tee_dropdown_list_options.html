@@ -1,0 +1,4 @@
+<option value="">---------</option>
+{% for tee in tees %}
+    <option value="{{ tee.id }}">{{ tee.color }} ({{ tee.rating }}/{{ tee.slope }})</option>
+{% endfor %}
