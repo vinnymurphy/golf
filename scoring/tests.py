@@ -40,6 +40,32 @@ class LeaderboardViewTests(TestCase):
         self.assertContains(response, "82")
 
 
+class StartRoundViewTests(TestCase):
+    def setUp(self):
+        self.user = UserModel.objects.create_user(username="golfer", password="unused")
+        self.course = Course.objects.create(name="Pine Valley")
+
+    def test_start_round_builds_scorecard_url_from_selected_course(self):
+        response = self.client.get(reverse("scoring:start_round"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.course.name)
+        self.assertContains(
+            response,
+            reverse("scoring:enter_scorecard", kwargs={"course_id": 0}),
+        )
+
+    def test_selected_course_scorecard_renders(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse("scoring:enter_scorecard", kwargs={"course_id": self.course.id})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Post Scorecard")
+
+
 class PlayerProfileViewTests(TestCase):
     def test_profile_chart_shows_historical_handicaps(self):
         user = UserModel.objects.create_user(
