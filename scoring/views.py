@@ -2,8 +2,8 @@ import json
 from math import ceil, exp, floor, pi, sqrt
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
@@ -355,9 +355,7 @@ def player_profile(request, username):
 
     # Get recent rounds for chart (ordered by date ascending)
     recent_rounds_list = list(
-        all_user_rounds.order_by("date")[
-            max(0, total_rounds - RECENT_ROUNDS_DISPLAY) :
-        ]
+        all_user_rounds.order_by("date")[max(0, total_rounds - RECENT_ROUNDS_DISPLAY) :]
     )
 
     # Build chart data
@@ -392,9 +390,7 @@ def player_profile(request, username):
     )
 
     # Calculate form trend (last 3 rounds)
-    recent_3_rounds = list(
-        all_user_rounds.order_by("-date")[:RECENT_ROUNDS_TREND]
-    )
+    recent_3_rounds = list(all_user_rounds.order_by("-date")[:RECENT_ROUNDS_TREND])
     trend_metric = _calculate_form_trend(recent_3_rounds, handicap_index)
 
     # Paginate all rounds for the rounds list
@@ -505,7 +501,11 @@ def setup_course_holes(request, course_id):
                     return render(
                         request,
                         "scoring/setup_holes_grid.html",
-                        {"course": course, "tee_sets": tee_sets, "hole_range": hole_range},
+                        {
+                            "course": course,
+                            "tee_sets": tee_sets,
+                            "hole_range": hole_range,
+                        },
                     )
                 hole_data.append((tee, hole_number, par_value, yardage_value))
 
