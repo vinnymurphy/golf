@@ -2,11 +2,13 @@ import json
 import logging
 import os
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from scoring.models import Course, Hole, HoleScore, Round, TeeSet
+
+UserModel = get_user_model()
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +139,7 @@ class Command(BaseCommand):
 
         # Get or create user with validation
         try:
-            user, created = User.objects.get_or_create(
+            user, created = UserModel.objects.get_or_create(
                 username=username, defaults={"is_active": True}
             )
             if created and verbose:

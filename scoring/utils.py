@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.db.models.query import QuerySet
 
 from .models import Round
+
+UserModel = get_user_model()
 
 # WHS Sliding Scale: Map total_rounds -> (num_to_use, adjustment_modifier)
 WHS_SLIDING_SCALE = {
@@ -64,7 +66,7 @@ def _num_differentials_to_use(count: int) -> tuple[int, float] | None:
     )
 
 
-def _get_rounds_queryset(player_input: User | QuerySet) -> QuerySet:
+def _get_rounds_queryset(player_input: UserModel | QuerySet) -> QuerySet:
     """
     Get rounds queryset, handling both User and QuerySet inputs.
 
@@ -74,12 +76,12 @@ def _get_rounds_queryset(player_input: User | QuerySet) -> QuerySet:
     Returns:
         A QuerySet of rounds ordered by date (newest first).
     """
-    if isinstance(player_input, User):
+    if isinstance(player_input, UserModel):
         return Round.objects.filter(user=player_input).order_by("-date")
     return player_input.order_by("-date")
 
 
-def calculate_handicap(player_input: User | QuerySet) -> HandicapResult:
+def calculate_handicap(player_input: UserModel | QuerySet) -> HandicapResult:
     """
     Calculate the WHS handicap index and identify the counting rounds.
 
