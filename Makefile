@@ -13,19 +13,19 @@ TIMESTAMP  := $(shell date +%F_%H%M%S)
 .PHONY: all backup clean format handicap help install lint manage migrate restore run setup shell test
 help:
 	@echo "Available commands:"
-	@echo "  make setup    - Create venv and install dependencies"
-	@echo "  make migrate  - Generate and apply database migrations"
-	@echo "  make run      - Start the Django development server"
-	@echo "  make test     - Run the test suite (Performance & Logic)"
-	@echo "  make shell    - Open the Django interactive shell"
-	@echo "  make manage ARGS='COMMAND [OPTIONS]' - Run a Django management command"
 	@echo "  make backup   - Export database to timestamped JSON"
-	@echo "  make restore  - Load data from the most recent backup file"
-	@echo "  make format   - Run formatters and auto-fix lint issues"
-	@echo "  make lint     - Run lint checks"
 	@echo "  make check    - Run format, test, and backup"
 	@echo "  make clean    - Remove __pycache__ and build artifacts"
+	@echo "  make format   - Run formatters and auto-fix lint issues"
 	@echo "  make handicap - Run the handicap fixing script to update all player handicaps based on their rounds"
+	@echo "  make lint     - Run lint checks"
+	@echo "  make manage ARGS='COMMAND [OPTIONS]' - Run a Django management command"
+	@echo "  make migrate  - Generate and apply database migrations"
+	@echo "  make restore  - Load data from the most recent backup file"
+	@echo "  make run      - Start the Django development server"
+	@echo "  make setup    - Create venv and install dependencies"
+	@echo "  make shell    - Open the Django interactive shell"
+	@echo "  make test     - Run the test suite (Performance & Logic)"
 
 
 setup:
