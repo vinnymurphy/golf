@@ -6,12 +6,29 @@ from pathlib import Path
 
 
 def get_user_input(date_played: str):
+    """"Args:
+        date_played: The date associated with the golf round.
+
+    Returns:
+        A dictionary containing the player's round information, or
+        ``None`` if no player name is entered.
+    """
     user_name = input("Enter name (leave blank to finish): ").strip()
     if not user_name:
         return None
 
-    user_score = input("Enter score(s): ").split()
-    scores = [int(score) for score in user_score]
+    while True:
+        user_score = input("Enter one total score or nine hole scores: ").split()
+        try:
+            scores = [int(score) for score in user_score]
+        except ValueError:
+            print("Scores must be whole numbers.")
+            continue
+
+        if len(scores) in {1, 9}:
+            break
+
+        print("Enter either one total score or exactly nine hole scores.")
 
     return {
         "completed_holes": 9,
