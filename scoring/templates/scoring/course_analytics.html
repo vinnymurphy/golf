@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}{{ course.name }} Analytics - BuddyScoring{% endblock %}
+{% block content %}
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h1 class="mb-1">{{ course.name }} Analytics</h1>
+            <p class="text-muted mb-0">{{ course.location }}</p>
+        </div>
+        <a class="btn btn-outline-secondary"
+           href="{% url 'scoring:leaderboard_detail' course.slug %}">Course Leaderboard</a>
+    </div>
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Rounds recorded</div>
+                    <div class="display-6 fw-bold">{{ round_stats.rounds_count }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Average gross score · all rounds</div>
+                    <div class="display-6 fw-bold">{{ round_stats.average_score|floatformat:1|default:"—" }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Hole scores recorded</div>
+                    <div class="display-6 fw-bold">{{ hole_scores_count }}</div>
+                    <div class="small text-muted">Individual holes recorded</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-bold">Average gross score by round length</div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Round length</th>
+                        <th>Rounds</th>
+                        <th class="text-end">Average score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for holes, stats in score_averages.items %}
+                        <tr>
+                            <td>{{ holes }} holes</td>
+                            <td>{{ stats.count }}</td>
+                            <td class="text-end fw-semibold">{{ stats.average|floatformat:1|default:"—" }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header fw-bold">Hardest holes</div>
+                {% if hardest_holes %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Hole</th>
+                                    <th>Average strokes</th>
+                                    <th>Average over par</th>
+                                    <th>Scores</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for hole in hardest_holes %}
+                                    <tr>
+                                        <td>{{ hole.hole_number }}</td>
+                                        <td>{{ hole.average_strokes|floatformat:1 }}</td>
+                                        <td>{% if hole.average_over_par >= 0 %}+{% endif %}{{ hole.average_over_par|floatformat:1 }}</td>
+                                        <td>{{ hole.scores_count }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="card-body text-muted">No hole-by-hole scores are available for this course yet.</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header fw-bold">Hole score distribution</div>
+                {% if hole_scores_count %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Result</th>
+                                    <th class="text-end">Holes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Eagle or better</td>
+                                    <td class="text-end">{{ score_distribution.eagle_or_better }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Birdie</td>
+                                    <td class="text-end">{{ score_distribution.birdie }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Par</td>
+                                    <td class="text-end">{{ score_distribution.par }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Bogey</td>
+                                    <td class="text-end">{{ score_distribution.bogey }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Double bogey</td>
+                                    <td class="text-end">{{ score_distribution.double_bogey }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Triple bogey or worse</td>
+                                    <td class="text-end">{{ score_distribution.triple_bogey_or_worse }}</td>
+                                </tr>
+                                <tr class="table-light fw-bold">
+                                    <td>Total recorded holes</td>
+                                    <td class="text-end">{{ hole_scores_count }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="card-body text-muted">No hole-by-hole scores are available for this course yet.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

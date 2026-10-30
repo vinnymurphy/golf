@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from django.contrib import admin
 
 from .models import Course, Hole, HoleScore, Round, TeeSet
@@ -13,14 +15,14 @@ class TeeSetInline(admin.TabularInline):
 class HoleInline(admin.TabularInline):
     model = Hole
     extra = 18  # Pre-populate 18 rows for convenience
-    fields = ("number", "handicap", "par")
+    fields = ("hole_number", "par", "yardage")
 
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
     list_display = ("name", "location")
     search_fields = ("name", "location")
-    inlines = [TeeSetInline]
+    inlines: ClassVar[list[type[admin.TabularInline]]] = [TeeSetInline]
 
 
 @admin.register(TeeSet)
@@ -28,7 +30,7 @@ class TeeSetAdmin(admin.ModelAdmin):
     list_display = ("course", "color", "rating", "slope")
     list_filter = ("course", "color")
     ordering = ("course", "color")
-    inlines = [HoleInline]
+    inlines: ClassVar[list[type[admin.TabularInline]]] = [HoleInline]
 
 
 @admin.register(Round)

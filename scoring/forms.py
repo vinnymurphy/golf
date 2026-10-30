@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import inlineformset_factory
@@ -44,8 +46,8 @@ class BaseHoleScoreFormSet(forms.BaseInlineFormSet):
 class HoleScoreForm(forms.ModelForm):
     class Meta:
         model = HoleScore
-        fields = ["strokes", "putts"]
-        labels = {
+        fields: ClassVar[tuple[str, ...]] = ("strokes", "putts")
+        labels: ClassVar[dict[str, str]] = {
             "strokes": "Strokes",
             "putts": "Putts",
         }
@@ -71,12 +73,12 @@ class HoleScoreForm(forms.ModelForm):
 
     class Meta:
         model = HoleScore
-        fields = ["strokes", "putts"]
-        labels = {
+        fields: ClassVar[tuple[str, ...]] = ("strokes", "putts")
+        labels: ClassVar[dict[str, str]] = {
             "strokes": "Strokes",
             "putts": "Putts",
         }
-        widgets = {
+        widgets: ClassVar[dict[str, forms.Widget]] = {
             "strokes": forms.NumberInput(
                 attrs={**NUMBER_INPUT_ATTRS, "min": 1, "placeholder": "Strokes"}
             ),
@@ -102,13 +104,13 @@ class TeeSetForm(forms.ModelForm):
 
     class Meta:
         model = TeeSet
-        fields = ["color", "rating", "slope"]
-        labels = {
+        fields: ClassVar[tuple[str, ...]] = ("color", "rating", "slope")
+        labels: ClassVar[dict[str, str]] = {
             "color": "Tee Color",
             "rating": "Course Rating",
             "slope": "Slope Rating",
         }
-        widgets = {
+        widgets: ClassVar[dict[str, forms.Widget]] = {
             "color": forms.TextInput(
                 attrs={
                     **FORM_CONTROL_ATTRS,
@@ -149,14 +151,19 @@ class RoundForm(forms.ModelForm):
 
     class Meta:
         model = Round
-        fields = ("course", "date", "total_gross_score", "completed_holes")
-        labels = {
+        fields: ClassVar[tuple[str, ...]] = (
+            "course",
+            "date",
+            "total_gross_score",
+            "completed_holes",
+        )
+        labels: ClassVar[dict[str, str]] = {
             "course": "Course",
             "date": "Date Played",
             "total_gross_score": "Total Gross Score",
             "completed_holes": "Holes Completed",
         }
-        widgets = {
+        widgets: ClassVar[dict[str, forms.Widget]] = {
             "date": forms.DateTimeInput(
                 attrs={**FORM_CONTROL_ATTRS, "type": "datetime-local"}
             ),

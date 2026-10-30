@@ -38,7 +38,11 @@
                         </td>
                         <td>
                             {% for item in entry.recent_scores %}
-                                <span class="badge bg-light text-dark border" title="{{ item.course }}">{{ item.score }}</span>
+                                <span class="badge bg-light text-dark border"
+                                      title="{{ item.course }} · {{ item.date|date:'M d, Y' }}">
+                                    <a class="text-dark text-decoration-none"
+                                       href="{% url 'scoring:round_detail' item.round_id %}">{{ item.score }}</a>
+                                </span>
                             {% endfor %}
                         </td>
                     </tr>

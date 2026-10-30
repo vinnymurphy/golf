@@ -40,6 +40,8 @@ class HandicapResult:
 
     index: float | None
     counting_round_ids: set[int]
+    rounds_considered: int
+    rounds_used: int
 
     def __str__(self) -> str:
         """Return formatted handicap index or 'N/A' if unavailable."""
@@ -103,20 +105,34 @@ def calculate_handicap(player_input: UserModel | QuerySet) -> HandicapResult:
         {1, 2, 3}
     """
     all_rounds = _get_rounds_queryset(player_input)
-    valid_rounds = list(all_rounds.exclude(differential__isnull=True))
+    valid_rounds = list(
+        all_rounds.exclude(differential__isnull=True).order_by(
+            "-date", "-created_at", "-pk"
+        )[:20]
+    )
     total_valid = len(valid_rounds)
 
     # Fetch the rules config (could be a tuple or None)
     rules = _num_differentials_to_use(total_valid)
 
     if rules is None:
-        return HandicapResult(index=None, counting_round_ids=set())
+        return HandicapResult(
+            index=None,
+            counting_round_ids=set(),
+            rounds_considered=total_valid,
+            rounds_used=0,
+        )
 
     num_to_use, adjustment = rules
 
     # Validate that num_to_use is positive to avoid division by zero
     if num_to_use <= 0:
-        return HandicapResult(index=None, counting_round_ids=set())
+        return HandicapResult(
+            index=None,
+            counting_round_ids=set(),
+            rounds_considered=total_valid,
+            rounds_used=0,
+        )
 
     # Sort rounds by differential (lowest first) and select the best ones
     sorted_rounds = sorted(
@@ -131,4 +147,9 @@ def calculate_handicap(player_input: UserModel | QuerySet) -> HandicapResult:
     average_diff = total_diff / num_to_use
     final_index = round(average_diff + adjustment, 1)
 
-    return HandicapResult(index=final_index, counting_round_ids=counting_ids)
+    return HandicapResult(
+        index=final_index,
+        counting_round_ids=counting_ids,
+        rounds_considered=total_valid,
+        rounds_used=num_to_use,
+    )

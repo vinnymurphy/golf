@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% block content %}
     <div class="container mt-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -7,18 +7,22 @@
         </div>
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1>{{ course.name }} Leaderboard</h1>
-            <div class="dropdown">
-                <button class="btn btn-outline-dark dropdown-toggle"
-                        type="button"
-                        data-bs-toggle="dropdown">Change Course</button>
-                <ul class="dropdown-menu">
-                    {% for course in all_courses %}
-                        <li>
-                            <a class="dropdown-item"
-                               href="{% url 'scoring:leaderboard_detail' course.slug %}">{{ course.name }}</a>
-                        </li>
-                    {% endfor %}
-                </ul>
+            <div class="d-flex gap-2">
+                <a class="btn btn-outline-success"
+                   href="{% url 'scoring:course_analytics' course.slug %}">Course Analytics</a>
+                <div class="dropdown">
+                    <button class="btn btn-outline-dark dropdown-toggle"
+                            type="button"
+                            data-bs-toggle="dropdown">Change Course</button>
+                    <ul class="dropdown-menu">
+                        {% for course in all_courses %}
+                            <li>
+                                <a class="dropdown-item"
+                                   href="{% url 'scoring:leaderboard_detail' course.slug %}">{{ course.name }}</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
             </div>
         </div>
         <table class="table table-hover shadow-sm bg-white">
@@ -43,7 +47,13 @@
                             <span class="badge bg-primary fs-6">{{ entry.handicap }}</span>
                         </td>
                         <td>
-                            {% for item in entry.recent_scores %}<span class="badge bg-light text-dark border">{{ item }}</span>{% endfor %}
+                            {% for item in entry.recent_scores %}
+                                <span class="badge bg-light text-dark border"
+                                      title="{{ item.date|date:'M d, Y' }}">
+                                    <a class="text-dark text-decoration-none"
+                                       href="{% url 'scoring:round_detail' item.round_id %}">{{ item.score }}</a>
+                                </span>
+                            {% endfor %}
                         </td>
                         <td>
                             {% if entry.sort_val < 4 %}
