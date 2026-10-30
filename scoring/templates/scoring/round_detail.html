@@ -13,10 +13,11 @@
                     <th>Hole</th>
                     <th>Par</th>
                     <th>Strokes</th>
+                    <th>Putts</th>
                 </tr>
             </thead>
             <tbody>
-                {% for score in round.scores.all %}
+                {% for score in hole_scores %}
                     <tr>
                         <td>{{ score.hole.hole_number }}</td>
                         <td>{{ score.hole.par }}</td>
@@ -30,6 +31,12 @@
                                 <span class="text-muted">(0)</span>
                             {% endif %}
                         </td>
+                        <td>{{ score.putts }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="4"
+                            class="text-center text-muted">No hole-by-hole scores were recorded for this round.</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -38,6 +45,7 @@
                     <td>TOTAL</td>
                     <td>{{ round.total_par }}</td>
                     <td>{{ total }}</td>
+                    <td>{{ total_putts }}</td>
                 </tr>
             </tfoot>
         </table>

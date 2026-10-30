@@ -233,11 +233,20 @@ def _build_course_leaderboard_data(course=None):
             recent_rounds = [
                 r for r in buddy.round_set.all() if r.course_id == course.id
             ]
-            recent_scores = [r.total_score for r in recent_rounds]
+            recent_scores = [
+                {"round_id": r.id, "score": r.total_score, "date": r.date}
+                for r in recent_rounds
+            ]
         else:
             recent_rounds = list(buddy.round_set.all())[:RECENT_GLOBAL_ROUNDS]
             recent_scores = [
-                {"score": r.total_score, "course": r.course.name} for r in recent_rounds
+                {
+                    "round_id": r.id,
+                    "score": r.total_score,
+                    "course": r.course.name,
+                    "date": r.date,
+                }
+                for r in recent_rounds
             ]
 
         leaderboard_data.append(
@@ -326,9 +335,11 @@ def round_detail(request, round_id):
     """
     Display details for a specific round.
     """
-    round_obj = get_object_or_404(Round, pk=round_id)
-    hole_scores = (
-        round_obj.scores.all().select_related("hole").order_by("hole__hole_number")
+    round_obj = get_object_or_404(
+        Round.objects.select_related("user", "course", "tee_set"), pk=round_id
+    )
+    hole_scores = list(
+        round_obj.scores.select_related("hole").order_by("hole__hole_number")
     )
 
     context = {
@@ -336,6 +347,7 @@ def round_detail(request, round_id):
         "hole_scores": hole_scores,
         "total": round_obj.total_score,
         "relative_to_par": round_obj.total_score - round_obj.total_par,
+        "total_putts": sum(score.putts for score in hole_scores),
     }
 
     return render(request, "scoring/round_detail.html", context)

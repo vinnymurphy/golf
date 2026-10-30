@@ -39,6 +39,13 @@ class LeaderboardViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Vincent")
         self.assertContains(response, "82")
+        self.assertContains(
+            response,
+            reverse(
+                "scoring:round_detail",
+                kwargs={"round_id": Round.objects.get(user=user).id},
+            ),
+        )
 
     def test_global_leaderboard_still_shows_recent_scores_from_other_dates(self):
         user = UserModel.objects.create_user(username="golfer", password="test-pass")
@@ -122,6 +129,11 @@ class LeaderboardViewTests(TestCase):
         self.assertContains(response, "79")
         self.assertNotContains(response, "84")
         self.assertContains(response, "Oct 23, 2026")
+        selected_round = Round.objects.get(user=user, date=selected_date)
+        self.assertContains(
+            response,
+            reverse("scoring:round_detail", kwargs={"round_id": selected_round.id}),
+        )
 
     def test_daily_scores_today_accepts_date_picker_selection(self):
         response = self.client.get(
@@ -131,6 +143,43 @@ class LeaderboardViewTests(TestCase):
         self.assertRedirects(
             response, "/golf/2026/10/23/", fetch_redirect_response=False
         )
+
+
+class RoundDetailViewTests(TestCase):
+    def test_round_detail_displays_strokes_and_putts_by_hole(self):
+        user = UserModel.objects.create_user(username="golfer", password="test-pass")
+        course = Course.objects.create(name="Pine Valley")
+        tee_set = TeeSet.objects.create(
+            course=course,
+            name="White",
+            color="White",
+            rating="72.0",
+            slope=113,
+        )
+        hole = Hole.objects.create(
+            tee_set=tee_set,
+            hole_number=1,
+            par=4,
+            yardage=350,
+        )
+        round_obj = Round.objects.create(
+            user=user,
+            course=course,
+            tee_set=tee_set,
+            total_gross_score=5,
+            completed_holes=9,
+        )
+        HoleScore.objects.create(round=round_obj, hole=hole, strokes=5, putts=2)
+
+        response = self.client.get(
+            reverse("scoring:round_detail", kwargs={"round_id": round_obj.id})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Strokes")
+        self.assertContains(response, "Putts")
+        self.assertContains(response, "5")
+        self.assertContains(response, "2")
 
 
 class StartRoundViewTests(TestCase):

@@ -41,7 +41,13 @@
                                 <td>{{ round.course.name }}</td>
                                 <td>{{ round.tee_set.name|default:"-" }}</td>
                                 <td>{{ round.completed_holes }}</td>
-                                <td class="text-end fw-bold">{{ round.total_gross_score }}</td>
+                                <td class="text-end fw-bold">
+                                    <a href="{% url 'scoring:round_detail' round.id %}"
+                                       class="text-decoration-none"
+                                       aria-label="View {{ round.user.get_full_name|default:round.user.username }} scorecard: {{ round.total_gross_score }}">
+                                        {{ round.total_gross_score }}
+                                    </a>
+                                </td>
                             </tr>
                         {% endfor %}
                     </tbody>

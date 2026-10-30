@@ -43,7 +43,13 @@
                             <span class="badge bg-primary fs-6">{{ entry.handicap }}</span>
                         </td>
                         <td>
-                            {% for item in entry.recent_scores %}<span class="badge bg-light text-dark border">{{ item }}</span>{% endfor %}
+                            {% for item in entry.recent_scores %}
+                                <span class="badge bg-light text-dark border"
+                                      title="{{ item.date|date:'M d, Y' }}">
+                                    <a class="text-dark text-decoration-none"
+                                       href="{% url 'scoring:round_detail' item.round_id %}">{{ item.score }}</a>
+                                </span>
+                            {% endfor %}
                         </td>
                         <td>
                             {% if entry.sort_val < 4 %}
