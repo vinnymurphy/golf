@@ -1,5 +1,6 @@
 import logging
 from decimal import Decimal
+from typing import ClassVar
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -20,7 +21,7 @@ class Course(models.Model):
         return self.name
 
     class Meta:
-        ordering = ["name"]
+        ordering: ClassVar[tuple[str, ...]] = ("name",)
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -40,7 +41,7 @@ class TeeSet(models.Model):
     slope = models.IntegerField(help_text="USGA Slope Rating (usually 55-155)")
 
     class Meta:
-        unique_together = ("course", "name")
+        unique_together: ClassVar[tuple[str, str]] = ("course", "name")
 
     def clean(self) -> None:
         if self.slope < 55 or self.slope > 155:
@@ -75,8 +76,8 @@ class Hole(models.Model):
         return f"{self.tee_set}, {self.hole_number}"
 
     class Meta:
-        unique_together = ("tee_set", "hole_number")
-        ordering = ["hole_number"]
+        unique_together: ClassVar[tuple[str, str]] = ("tee_set", "hole_number")
+        ordering: ClassVar[tuple[str, ...]] = ("hole_number",)
 
 
 class Round(models.Model):
@@ -142,7 +143,7 @@ class Round(models.Model):
             # Use full 18-hole ratings for both scenarios
             rating = Decimal(str(tee.rating))
             slope = Decimal(str(tee.slope))
-            USGA_HANDICAP_INDEX = Decimal("113")
+            USGA_HANDICAP_INDEX = Decimal(113)
 
             if self.completed_holes == 9:
                 # 1. Double the score to see the 18-hole "pace"
@@ -160,12 +161,12 @@ class Round(models.Model):
             return None
 
     class Meta:
-        indexes = [
+        indexes: ClassVar[list[models.Index]] = [
             models.Index(fields=["user", "-date"]),
             models.Index(fields=["course", "-date"]),
             models.Index(fields=["user", "course", "-date"]),
         ]
-        ordering = ["-date"]
+        ordering: ClassVar[tuple[str, ...]] = ("-date",)
 
     def __str__(self):
         return f"{self.user.username} at {self.course.name} ({self.date})"

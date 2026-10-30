@@ -316,7 +316,7 @@ class RoundListView(ListView):
     model = Round
     template_name = "scoring/round_list.html"
     context_object_name = "rounds"
-    ordering = ["-date"]
+    ordering = "-date"
     paginate_by = PAGINATION_PAGE_SIZE
 
 
