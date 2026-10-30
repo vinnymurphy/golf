@@ -48,6 +48,24 @@
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <div class="navbar-nav ms-auto">
                         <a class="nav-link" href="{% url 'scoring:global_leaderboard' %}">Leaderboard</a>
+                        <a class="nav-link" href="{% url 'scoring:daily_scores_today' %}">Daily Scores</a>
+                        <div class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle"
+                               href="#"
+                               role="button"
+                               data-bs-toggle="dropdown"
+                               aria-expanded="false">Course Analytics</a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                {% for course in course_analytics_courses %}
+                                    <li>
+                                        <a class="dropdown-item"
+                                           href="{% url 'scoring:course_analytics' course.slug %}">{{ course.name }}</a>
+                                    </li>
+                                {% empty %}
+                                    <li><span class="dropdown-item-text text-muted">No courses available</span></li>
+                                {% endfor %}
+                            </ul>
+                        </div>
                         <a class="nav-link" href="{% url 'scoring:add_round' %}">Post Score</a>
                         <a class="nav-link" href="{% url 'scoring:bulk_add_rounds' %}">Bulk Entry</a>
                     </div>
@@ -67,13 +85,12 @@
                     </div>
                 {% endfor %}
             {% endif %}
-            {% block content %}
-            {% endblock %}
+            {% block content %}{% endblock %}
         </main>
         <footer class="bg-dark text-white text-center py-4 mt-5">
             <div class="container">
                 <p class="mb-0">
-                    &copy; 2026 BuddyScoring. All rights reserved.
+                    © 2026 BuddyScoring. All rights reserved.
                     <span class="mx-2 text-secondary">|</span>
                     <a class="link-light" href="https://github.com/vinnymurphy/golf">Source code on GitHub</a>
                 </p>

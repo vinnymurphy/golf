@@ -44,6 +44,12 @@ urlpatterns = [
     # ========== LEADERBOARDS ==========
     path("", views.global_leaderboard, name="global_leaderboard"),
     path("leaderboard/<slug:slug>/", views.leaderboard_view, name="leaderboard_detail"),
+    path(
+        "courses/<slug:slug>/analytics/",
+        views.course_analytics,
+        name="course_analytics",
+    ),
+    path("scores/", views.daily_scores_today, name="daily_scores_today"),
     # ========== ROUNDS ==========
     path("rounds/", views.RoundListView.as_view(), name="round_list"),
     path("rounds/add/", views.add_round, name="add_round"),
@@ -67,4 +73,9 @@ urlpatterns = [
     # ========== AJAX ENDPOINTS ==========
     # Asynchronous data loading for frontend interactions
     path("ajax/load-tees/", views.load_tees, name="ajax_load_tees"),
+    path(
+        "<int:year>/<int:month>/<int:day>/",
+        views.daily_scores,
+        name="daily_scores",
+    ),
 ]

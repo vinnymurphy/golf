@@ -7,6 +7,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from scoring.models import Course, Round, TeeSet
 
+logger = logging.getLogger(__name__)
 UserModel = get_user_model()
 
 
@@ -69,6 +70,7 @@ class Command(BaseCommand):
                         tee_name = row.get("tee name", "White").strip() or "White"
                         tee_set, _ = TeeSet.objects.get_or_create(
                             course=course,
+                            name=tee_name,
                             color=tee_name,
                             defaults={"rating": 71.2, "slope": 113},
                         )
@@ -101,9 +103,10 @@ class Command(BaseCommand):
                             course=course,
                             tee_set=tee_set,
                             date=round_date,
-                            gross_score=gross_score,
+                            total_gross_score=gross_score,
+                            completed_holes=18,
                         )
-                        logging.info(f"Created round: {round_obj}")
+                        logger.info("Created round: %s", round_obj)
                         self.stdout.write(
                             self.style.SUCCESS(
                                 f"Imported round for {user.username} at {course.name} on {round_date} with score {gross_score}"
@@ -118,9 +121,9 @@ class Command(BaseCommand):
                             )
                         )
 
-                    except Exception as e:
+                    except (KeyError, TypeError, ValueError) as exc:
                         self.stdout.write(
-                            self.style.ERROR(f"Row {row_num}: Error - {str(e)}")
+                            self.style.ERROR(f"Row {row_num}: Error - {exc!s}")
                         )
                         skipped_count += 1
                         continue

@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def get_user_input(date_played: str):
-    """"Args:
+    """ "Args:
         date_played: The date associated with the golf round.
 
     Returns:
@@ -30,12 +30,13 @@ def get_user_input(date_played: str):
 
         print("Enter either one total score or exactly nine hole scores.")
 
+    red_player = {"don", "mike", "wally"}
     return {
         "completed_holes": 9,
         "course": "Rochester Golf Club",
         "date": date_played,
         "hole_scores": [] if len(scores) == 1 else scores,
-        "tee_set_name": "Red" if user_name.lower() in {"mike", "don"} else "White",
+        "tee_set_name": "Red" if user_name.lower() in red_player else "White",
         "total_gross_score": sum(scores),
         "username": user_name,
     }

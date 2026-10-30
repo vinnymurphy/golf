@@ -98,7 +98,8 @@
                                            {% if player.id|stringformat:"s" in selected_player_ids %}checked{% endif %}>
                                 </td>
                                 <td>
-                                    <label for="player-{{ player.id }}" class="mb-0">{{ player.get_full_name|default:player.username }}</label>
+                                    <label for="player-{{ player.id }}"
+                                           class="mb-0">{{ player.get_full_name|default:player.username }}</label>
                                 </td>
                                 <td class="total-column">
                                     <input type="number"

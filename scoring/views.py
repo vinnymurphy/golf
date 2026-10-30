@@ -1,4 +1,6 @@
 import json
+from collections import defaultdict
+from datetime import date
 from math import ceil, exp, floor, pi, sqrt
 
 from django.contrib import messages
@@ -7,10 +9,11 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
-from django.db.models import Avg, Min, Prefetch
+from django.db.models import Avg, Count, Min, Prefetch
 from django.forms import inlineformset_factory
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.generic import ListView
 
@@ -231,11 +234,20 @@ def _build_course_leaderboard_data(course=None):
             recent_rounds = [
                 r for r in buddy.round_set.all() if r.course_id == course.id
             ]
-            recent_scores = [r.total_score for r in recent_rounds]
+            recent_scores = [
+                {"round_id": r.id, "score": r.total_score, "date": r.date}
+                for r in recent_rounds
+            ]
         else:
             recent_rounds = list(buddy.round_set.all())[:RECENT_GLOBAL_ROUNDS]
             recent_scores = [
-                {"score": r.total_score, "course": r.course.name} for r in recent_rounds
+                {
+                    "round_id": r.id,
+                    "score": r.total_score,
+                    "course": r.course.name,
+                    "date": r.date,
+                }
+                for r in recent_rounds
             ]
 
         leaderboard_data.append(
@@ -316,7 +328,7 @@ class RoundListView(ListView):
     model = Round
     template_name = "scoring/round_list.html"
     context_object_name = "rounds"
-    ordering = ["-date"]
+    ordering = "-date"
     paginate_by = PAGINATION_PAGE_SIZE
 
 
@@ -324,9 +336,11 @@ def round_detail(request, round_id):
     """
     Display details for a specific round.
     """
-    round_obj = get_object_or_404(Round, pk=round_id)
-    hole_scores = (
-        round_obj.scores.all().select_related("hole").order_by("hole__hole_number")
+    round_obj = get_object_or_404(
+        Round.objects.select_related("user", "course", "tee_set"), pk=round_id
+    )
+    hole_scores = list(
+        round_obj.scores.select_related("hole").order_by("hole__hole_number")
     )
 
     context = {
@@ -334,6 +348,7 @@ def round_detail(request, round_id):
         "hole_scores": hole_scores,
         "total": round_obj.total_score,
         "relative_to_par": round_obj.total_score - round_obj.total_par,
+        "total_putts": sum(score.putts for score in hole_scores),
     }
 
     return render(request, "scoring/round_detail.html", context)
@@ -408,6 +423,8 @@ def player_profile(request, username):
         "rounds_page": rounds_page,
         "total_rounds": total_rounds,
         "handicap_index": handicap_index,
+        "handicap_rounds_considered": handicap_result.rounds_considered,
+        "handicap_rounds_used": handicap_result.rounds_used,
         "counting_ids": counting_ids,
         "low_score": stats["low_score"],
         "avg_score": (round(stats["avg_score"], 1) if stats["avg_score"] else None),
@@ -568,6 +585,85 @@ def leaderboard_view(request, slug):
     return render(request, "scoring/leaderboard.html", context)
 
 
+def course_analytics(request, slug):
+    """Summarize round and hole-by-hole scoring for a course."""
+    course = get_object_or_404(Course, slug=slug)
+    course_rounds = Round.objects.filter(course=course, total_gross_score__gt=0)
+    round_stats = course_rounds.aggregate(
+        average_score=Avg("total_gross_score"),
+        rounds_count=Count("id"),
+    )
+    score_averages = {}
+    for holes_played in (9, 18):
+        stats = course_rounds.filter(completed_holes=holes_played).aggregate(
+            average=Avg("total_gross_score"),
+            count=Count("id"),
+        )
+        score_averages[holes_played] = stats
+
+    hole_totals = defaultdict(lambda: {"relative_total": 0, "strokes_total": 0, "count": 0})
+    score_distribution = {
+        "eagle_or_better": 0,
+        "birdie": 0,
+        "par": 0,
+        "bogey": 0,
+        "double_bogey": 0,
+        "triple_bogey_or_worse": 0,
+    }
+    hole_scores = (
+        HoleScore.objects.filter(round__course=course)
+        .select_related("hole")
+        .only("strokes", "hole__hole_number", "hole__par")
+    )
+
+    for score in hole_scores:
+        relative_to_par = score.strokes - score.hole.par
+        hole_total = hole_totals[score.hole.hole_number]
+        hole_total["relative_total"] += relative_to_par
+        hole_total["strokes_total"] += score.strokes
+        hole_total["count"] += 1
+
+        if relative_to_par <= -2:
+            category = "eagle_or_better"
+        elif relative_to_par == -1:
+            category = "birdie"
+        elif relative_to_par == 0:
+            category = "par"
+        elif relative_to_par == 1:
+            category = "bogey"
+        elif relative_to_par == 2:
+            category = "double_bogey"
+        else:
+            category = "triple_bogey_or_worse"
+        score_distribution[category] += 1
+
+    hardest_holes = [
+        {
+            "hole_number": hole_number,
+            "average_over_par": totals["relative_total"] / totals["count"],
+            "average_strokes": totals["strokes_total"] / totals["count"],
+            "scores_count": totals["count"],
+        }
+        for hole_number, totals in hole_totals.items()
+    ]
+    hardest_holes.sort(
+        key=lambda hole: (-hole["average_over_par"], hole["hole_number"])
+    )
+
+    return render(
+        request,
+        "scoring/course_analytics.html",
+        {
+            "course": course,
+            "round_stats": round_stats,
+            "score_averages": score_averages,
+            "hardest_holes": hardest_holes[:5],
+            "score_distribution": score_distribution,
+            "hole_scores_count": sum(score_distribution.values()),
+        },
+    )
+
+
 def global_leaderboard(request):
     """
     Display global leaderboard across all courses with pagination.
@@ -590,6 +686,46 @@ def global_leaderboard(request):
     }
 
     return render(request, "scoring/global_leaderboard.html", context)
+
+
+def daily_scores_today(request):
+    """Redirect to the daily scores page for a selected date, defaulting to today."""
+    date_value = request.GET.get("date")
+    selected_date = parse_date(date_value) if date_value else timezone.localdate()
+    if selected_date is None:
+        messages.error(request, "Please select a valid date.")
+        selected_date = timezone.localdate()
+
+    return redirect(
+        "scoring:daily_scores",
+        year=selected_date.year,
+        month=selected_date.month,
+        day=selected_date.day,
+    )
+
+
+def daily_scores(request, year, month, day):
+    """Show only the rounds played on the requested calendar date."""
+    try:
+        selected_date = date(year, month, day)
+    except ValueError as exc:
+        raise Http404("Invalid score date") from exc
+
+    rounds = (
+        Round.objects.filter(date=selected_date)
+        .select_related("user", "course", "tee_set")
+        .order_by(
+            "total_gross_score",
+            "user__first_name",
+            "user__username",
+            "course__name",
+        )
+    )
+    return render(
+        request,
+        "scoring/daily_scores.html",
+        {"rounds": rounds, "selected_date": selected_date},
+    )
 
 
 @login_required

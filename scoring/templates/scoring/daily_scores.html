@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Scores for {{ selected_date|date:"M d, Y" }} - BuddyScoring{% endblock %}
+{% block content %}
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <h1 class="mb-0">Scores for {{ selected_date|date:"M d, Y" }}</h1>
+        <form method="get"
+              action="{% url 'scoring:daily_scores_today' %}"
+              class="d-flex gap-2">
+            <label for="score-date" class="visually-hidden">Choose a date</label>
+            <input id="score-date"
+                   class="form-control"
+                   type="date"
+                   name="date"
+                   value="{{ selected_date|date:'Y-m-d' }}"
+                   required>
+            <button class="btn btn-primary text-nowrap" type="submit">Show scores</button>
+        </form>
+    </div>
+    {% if rounds %}
+        <div class="card shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Player</th>
+                            <th>Course</th>
+                            <th>Tee Set</th>
+                            <th>Holes</th>
+                            <th class="text-end">Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for round in rounds %}
+                            <tr>
+                                <td>
+                                    <a class="fw-semibold text-decoration-none"
+                                       href="{% url 'scoring:player_profile' round.user.username %}">
+                                        {{ round.user.get_full_name|default:round.user.username }}
+                                    </a>
+                                </td>
+                                <td>{{ round.course.name }}</td>
+                                <td>{{ round.tee_set.name|default:"-" }}</td>
+                                <td>{{ round.completed_holes }}</td>
+                                <td class="text-end fw-bold">
+                                    <a href="{% url 'scoring:round_detail' round.id %}"
+                                       class="text-decoration-none"
+                                       aria-label="View {{ round.user.get_full_name|default:round.user.username }} scorecard: {{ round.total_gross_score }}">
+                                        {{ round.total_gross_score }}
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <div class="card text-center p-5">
+            <div class="card-body">
+                <h2 class="h4 text-muted">No scores recorded for this date</h2>
+                <p class="text-muted mb-0">Choose another date to view its scores.</p>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}

@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from .models import Course, Hole, HoleScore, Round, TeeSet
 
@@ -38,6 +39,198 @@ class LeaderboardViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Vincent")
         self.assertContains(response, "82")
+        self.assertContains(response, "Course Analytics")
+        self.assertContains(
+            response,
+            reverse("scoring:course_analytics", kwargs={"slug": course.slug}),
+        )
+        self.assertContains(
+            response,
+            reverse(
+                "scoring:round_detail",
+                kwargs={"round_id": Round.objects.get(user=user).id},
+            ),
+        )
+
+    def test_course_analytics_summarizes_rounds_holes_and_score_distribution(self):
+        user = UserModel.objects.create_user(username="golfer", password="test-pass")
+        course = Course.objects.create(name="Pine Valley")
+        tee_set = TeeSet.objects.create(
+            course=course,
+            name="White",
+            color="White",
+            rating="72.0",
+            slope=113,
+        )
+        par_four = Hole.objects.create(
+            tee_set=tee_set, hole_number=1, par=4, yardage=350
+        )
+        par_three = Hole.objects.create(
+            tee_set=tee_set, hole_number=2, par=3, yardage=170
+        )
+        round_obj = Round.objects.create(
+            user=user,
+            course=course,
+            tee_set=tee_set,
+            total_gross_score=41,
+            completed_holes=9,
+        )
+        HoleScore.objects.create(round=round_obj, hole=par_four, strokes=3, putts=1)
+        HoleScore.objects.create(round=round_obj, hole=par_three, strokes=5, putts=2)
+        Round.objects.create(
+            user=user,
+            course=course,
+            total_gross_score=85,
+            completed_holes=18,
+        )
+
+        response = self.client.get(
+            reverse("scoring:course_analytics", kwargs={"slug": course.slug})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["round_stats"]["rounds_count"], 2)
+        self.assertEqual(response.context["round_stats"]["average_score"], 63)
+        self.assertEqual(response.context["score_averages"][9]["average"], 41)
+        self.assertEqual(response.context["score_averages"][18]["average"], 85)
+        self.assertEqual(response.context["hardest_holes"][0]["hole_number"], 2)
+        self.assertEqual(response.context["hardest_holes"][0]["average_over_par"], 2)
+        self.assertEqual(response.context["score_distribution"]["birdie"], 1)
+        self.assertEqual(response.context["score_distribution"]["double_bogey"], 1)
+
+    def test_global_leaderboard_still_shows_recent_scores_from_other_dates(self):
+        user = UserModel.objects.create_user(username="golfer", password="test-pass")
+        course = Course.objects.create(name="Pine Valley")
+        Round.objects.create(
+            user=user,
+            course=course,
+            date=date(2026, 10, 23),
+            total_gross_score=79,
+        )
+        Round.objects.create(
+            user=user,
+            course=course,
+            date=date(2026, 10, 30),
+            total_gross_score=84,
+        )
+
+        response = self.client.get(reverse("scoring:global_leaderboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "79")
+        self.assertContains(response, "84")
+
+    def test_daily_scores_today_redirects_to_today_date(self):
+        response = self.client.get(reverse("scoring:daily_scores_today"))
+
+        today = timezone.localdate()
+        self.assertRedirects(
+            response,
+            reverse(
+                "scoring:daily_scores",
+                kwargs={"year": today.year, "month": today.month, "day": today.day},
+            ),
+        )
+
+    def test_daily_scores_page_shows_only_rounds_for_selected_date(self):
+        user = UserModel.objects.create_user(username="golfer", password="test-pass")
+        course = Course.objects.create(name="Pine Valley")
+        selected_date = date(2026, 10, 23)
+        Round.objects.create(
+            user=user,
+            course=course,
+            date=selected_date,
+            total_gross_score=79,
+        )
+        best_scorer = UserModel.objects.create_user(
+            username="bestscorer", password="test-pass"
+        )
+        Round.objects.create(
+            user=best_scorer,
+            course=course,
+            date=selected_date,
+            total_gross_score=72,
+        )
+        Round.objects.create(
+            user=user,
+            course=course,
+            date=date(2026, 10, 30),
+            total_gross_score=84,
+        )
+
+        response = self.client.get(
+            reverse(
+                "scoring:daily_scores",
+                kwargs={
+                    "year": selected_date.year,
+                    "month": selected_date.month,
+                    "day": selected_date.day,
+                },
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            list(
+                response.context["rounds"].values_list("total_gross_score", flat=True)
+            ),
+            [72, 79],
+        )
+        self.assertContains(response, "72")
+        self.assertContains(response, "79")
+        self.assertNotContains(response, "84")
+        self.assertContains(response, "Oct 23, 2026")
+        selected_round = Round.objects.get(user=user, date=selected_date)
+        self.assertContains(
+            response,
+            reverse("scoring:round_detail", kwargs={"round_id": selected_round.id}),
+        )
+
+    def test_daily_scores_today_accepts_date_picker_selection(self):
+        response = self.client.get(
+            reverse("scoring:daily_scores_today"), {"date": "2026-10-23"}
+        )
+
+        self.assertRedirects(
+            response, "/golf/2026/10/23/", fetch_redirect_response=False
+        )
+
+
+class RoundDetailViewTests(TestCase):
+    def test_round_detail_displays_strokes_and_putts_by_hole(self):
+        user = UserModel.objects.create_user(username="golfer", password="test-pass")
+        course = Course.objects.create(name="Pine Valley")
+        tee_set = TeeSet.objects.create(
+            course=course,
+            name="White",
+            color="White",
+            rating="72.0",
+            slope=113,
+        )
+        hole = Hole.objects.create(
+            tee_set=tee_set,
+            hole_number=1,
+            par=4,
+            yardage=350,
+        )
+        round_obj = Round.objects.create(
+            user=user,
+            course=course,
+            tee_set=tee_set,
+            total_gross_score=5,
+            completed_holes=9,
+        )
+        HoleScore.objects.create(round=round_obj, hole=hole, strokes=5, putts=2)
+
+        response = self.client.get(
+            reverse("scoring:round_detail", kwargs={"round_id": round_obj.id})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Strokes")
+        self.assertContains(response, "Putts")
+        self.assertContains(response, "5")
+        self.assertContains(response, "2")
 
 
 class StartRoundViewTests(TestCase):
@@ -129,6 +322,31 @@ class PlayerProfileViewTests(TestCase):
         handicaps = json.loads(response.context["chart_handicaps_json"])
 
         self.assertEqual(handicaps, [None, None, 18.0, 9.0])
+
+    def test_profile_handicap_uses_only_the_latest_20_differentials(self):
+        user = UserModel.objects.create_user(username="golfer", password="test-pass")
+        course = Course.objects.create(name="Pine Valley")
+        start_date = date(2026, 1, 1)
+
+        for offset in range(21):
+            Round.objects.create(
+                user=user,
+                course=course,
+                date=start_date + timedelta(days=offset),
+                total_gross_score=80,
+                differential=str(offset + 1),
+            )
+
+        response = self.client.get(
+            reverse("scoring:player_profile", kwargs={"username": user.username})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["handicap_index"], 5.5)
+        self.assertEqual(response.context["handicap_rounds_considered"], 20)
+        self.assertEqual(response.context["handicap_rounds_used"], 8)
+        oldest_round = Round.objects.get(user=user, date=start_date)
+        self.assertNotIn(oldest_round.id, response.context["counting_ids"])
 
     def test_profile_includes_9_hole_score_distribution(self):
         user = UserModel.objects.create_user(username="vinny", password="unused")
