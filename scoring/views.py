@@ -1,4 +1,5 @@
 import json
+from datetime import date
 from math import ceil, exp, floor, pi, sqrt
 
 from django.contrib import messages
@@ -9,8 +10,9 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.db.models import Avg, Min, Prefetch
 from django.forms import inlineformset_factory
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.generic import ListView
 
@@ -590,6 +592,46 @@ def global_leaderboard(request):
     }
 
     return render(request, "scoring/global_leaderboard.html", context)
+
+
+def daily_scores_today(request):
+    """Redirect to the daily scores page for a selected date, defaulting to today."""
+    date_value = request.GET.get("date")
+    selected_date = parse_date(date_value) if date_value else timezone.localdate()
+    if selected_date is None:
+        messages.error(request, "Please select a valid date.")
+        selected_date = timezone.localdate()
+
+    return redirect(
+        "scoring:daily_scores",
+        year=selected_date.year,
+        month=selected_date.month,
+        day=selected_date.day,
+    )
+
+
+def daily_scores(request, year, month, day):
+    """Show only the rounds played on the requested calendar date."""
+    try:
+        selected_date = date(year, month, day)
+    except ValueError as exc:
+        raise Http404("Invalid score date") from exc
+
+    rounds = (
+        Round.objects.filter(date=selected_date)
+        .select_related("user", "course", "tee_set")
+        .order_by(
+            "total_gross_score",
+            "user__first_name",
+            "user__username",
+            "course__name",
+        )
+    )
+    return render(
+        request,
+        "scoring/daily_scores.html",
+        {"rounds": rounds, "selected_date": selected_date},
+    )
 
 
 @login_required
