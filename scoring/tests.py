@@ -39,6 +39,11 @@ class LeaderboardViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Vincent")
         self.assertContains(response, "82")
+        self.assertContains(response, "Course Analytics")
+        self.assertContains(
+            response,
+            reverse("scoring:course_analytics", kwargs={"slug": course.slug}),
+        )
         self.assertContains(
             response,
             reverse(
@@ -46,6 +51,52 @@ class LeaderboardViewTests(TestCase):
                 kwargs={"round_id": Round.objects.get(user=user).id},
             ),
         )
+
+    def test_course_analytics_summarizes_rounds_holes_and_score_distribution(self):
+        user = UserModel.objects.create_user(username="golfer", password="test-pass")
+        course = Course.objects.create(name="Pine Valley")
+        tee_set = TeeSet.objects.create(
+            course=course,
+            name="White",
+            color="White",
+            rating="72.0",
+            slope=113,
+        )
+        par_four = Hole.objects.create(
+            tee_set=tee_set, hole_number=1, par=4, yardage=350
+        )
+        par_three = Hole.objects.create(
+            tee_set=tee_set, hole_number=2, par=3, yardage=170
+        )
+        round_obj = Round.objects.create(
+            user=user,
+            course=course,
+            tee_set=tee_set,
+            total_gross_score=41,
+            completed_holes=9,
+        )
+        HoleScore.objects.create(round=round_obj, hole=par_four, strokes=3, putts=1)
+        HoleScore.objects.create(round=round_obj, hole=par_three, strokes=5, putts=2)
+        Round.objects.create(
+            user=user,
+            course=course,
+            total_gross_score=85,
+            completed_holes=18,
+        )
+
+        response = self.client.get(
+            reverse("scoring:course_analytics", kwargs={"slug": course.slug})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["round_stats"]["rounds_count"], 2)
+        self.assertEqual(response.context["round_stats"]["average_score"], 63)
+        self.assertEqual(response.context["score_averages"][9]["average"], 41)
+        self.assertEqual(response.context["score_averages"][18]["average"], 85)
+        self.assertEqual(response.context["hardest_holes"][0]["hole_number"], 2)
+        self.assertEqual(response.context["hardest_holes"][0]["average_over_par"], 2)
+        self.assertEqual(response.context["score_distribution"]["birdie"], 1)
+        self.assertEqual(response.context["score_distribution"]["double_bogey"], 1)
 
     def test_global_leaderboard_still_shows_recent_scores_from_other_dates(self):
         user = UserModel.objects.create_user(username="golfer", password="test-pass")

@@ -1,4 +1,5 @@
 import json
+from collections import defaultdict
 from datetime import date
 from math import ceil, exp, floor, pi, sqrt
 
@@ -8,7 +9,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
-from django.db.models import Avg, Min, Prefetch
+from django.db.models import Avg, Count, Min, Prefetch
 from django.forms import inlineformset_factory
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -582,6 +583,85 @@ def leaderboard_view(request, slug):
     }
 
     return render(request, "scoring/leaderboard.html", context)
+
+
+def course_analytics(request, slug):
+    """Summarize round and hole-by-hole scoring for a course."""
+    course = get_object_or_404(Course, slug=slug)
+    course_rounds = Round.objects.filter(course=course, total_gross_score__gt=0)
+    round_stats = course_rounds.aggregate(
+        average_score=Avg("total_gross_score"),
+        rounds_count=Count("id"),
+    )
+    score_averages = {}
+    for holes_played in (9, 18):
+        stats = course_rounds.filter(completed_holes=holes_played).aggregate(
+            average=Avg("total_gross_score"),
+            count=Count("id"),
+        )
+        score_averages[holes_played] = stats
+
+    hole_totals = defaultdict(lambda: {"relative_total": 0, "strokes_total": 0, "count": 0})
+    score_distribution = {
+        "eagle_or_better": 0,
+        "birdie": 0,
+        "par": 0,
+        "bogey": 0,
+        "double_bogey": 0,
+        "triple_bogey_or_worse": 0,
+    }
+    hole_scores = (
+        HoleScore.objects.filter(round__course=course)
+        .select_related("hole")
+        .only("strokes", "hole__hole_number", "hole__par")
+    )
+
+    for score in hole_scores:
+        relative_to_par = score.strokes - score.hole.par
+        hole_total = hole_totals[score.hole.hole_number]
+        hole_total["relative_total"] += relative_to_par
+        hole_total["strokes_total"] += score.strokes
+        hole_total["count"] += 1
+
+        if relative_to_par <= -2:
+            category = "eagle_or_better"
+        elif relative_to_par == -1:
+            category = "birdie"
+        elif relative_to_par == 0:
+            category = "par"
+        elif relative_to_par == 1:
+            category = "bogey"
+        elif relative_to_par == 2:
+            category = "double_bogey"
+        else:
+            category = "triple_bogey_or_worse"
+        score_distribution[category] += 1
+
+    hardest_holes = [
+        {
+            "hole_number": hole_number,
+            "average_over_par": totals["relative_total"] / totals["count"],
+            "average_strokes": totals["strokes_total"] / totals["count"],
+            "scores_count": totals["count"],
+        }
+        for hole_number, totals in hole_totals.items()
+    ]
+    hardest_holes.sort(
+        key=lambda hole: (-hole["average_over_par"], hole["hole_number"])
+    )
+
+    return render(
+        request,
+        "scoring/course_analytics.html",
+        {
+            "course": course,
+            "round_stats": round_stats,
+            "score_averages": score_averages,
+            "hardest_holes": hardest_holes[:5],
+            "score_distribution": score_distribution,
+            "hole_scores_count": sum(score_distribution.values()),
+        },
+    )
 
 
 def global_leaderboard(request):

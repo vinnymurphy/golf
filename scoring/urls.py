@@ -44,6 +44,11 @@ urlpatterns = [
     # ========== LEADERBOARDS ==========
     path("", views.global_leaderboard, name="global_leaderboard"),
     path("leaderboard/<slug:slug>/", views.leaderboard_view, name="leaderboard_detail"),
+    path(
+        "courses/<slug:slug>/analytics/",
+        views.course_analytics,
+        name="course_analytics",
+    ),
     path("scores/", views.daily_scores_today, name="daily_scores_today"),
     # ========== ROUNDS ==========
     path("rounds/", views.RoundListView.as_view(), name="round_list"),
