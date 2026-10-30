@@ -113,7 +113,9 @@ class LeaderboardViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            list(response.context["rounds"].values_list("total_gross_score", flat=True)),
+            list(
+                response.context["rounds"].values_list("total_gross_score", flat=True)
+            ),
             [72, 79],
         )
         self.assertContains(response, "72")
@@ -220,6 +222,31 @@ class PlayerProfileViewTests(TestCase):
         handicaps = json.loads(response.context["chart_handicaps_json"])
 
         self.assertEqual(handicaps, [None, None, 18.0, 9.0])
+
+    def test_profile_handicap_uses_only_the_latest_20_differentials(self):
+        user = UserModel.objects.create_user(username="golfer", password="test-pass")
+        course = Course.objects.create(name="Pine Valley")
+        start_date = date(2026, 1, 1)
+
+        for offset in range(21):
+            Round.objects.create(
+                user=user,
+                course=course,
+                date=start_date + timedelta(days=offset),
+                total_gross_score=80,
+                differential=str(offset + 1),
+            )
+
+        response = self.client.get(
+            reverse("scoring:player_profile", kwargs={"username": user.username})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["handicap_index"], 5.5)
+        self.assertEqual(response.context["handicap_rounds_considered"], 20)
+        self.assertEqual(response.context["handicap_rounds_used"], 8)
+        oldest_round = Round.objects.get(user=user, date=start_date)
+        self.assertNotIn(oldest_round.id, response.context["counting_ids"])
 
     def test_profile_includes_9_hole_score_distribution(self):
         user = UserModel.objects.create_user(username="vinny", password="unused")

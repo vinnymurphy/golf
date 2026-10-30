@@ -410,6 +410,8 @@ def player_profile(request, username):
         "rounds_page": rounds_page,
         "total_rounds": total_rounds,
         "handicap_index": handicap_index,
+        "handicap_rounds_considered": handicap_result.rounds_considered,
+        "handicap_rounds_used": handicap_result.rounds_used,
         "counting_ids": counting_ids,
         "low_score": stats["low_score"],
         "avg_score": (round(stats["avg_score"], 1) if stats["avg_score"] else None),

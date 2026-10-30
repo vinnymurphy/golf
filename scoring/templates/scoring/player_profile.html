@@ -13,6 +13,14 @@
                 <div class="card bg-dark text-white text-center p-4 shadow-sm h-100">
                     <h6 class="text-uppercase text-muted small mb-1">WHS Handicap Index</h6>
                     <h1 class="display-3 fw-bold my-2 text-success">{{ handicap_index }}</h1>
+                    {% if handicap_index is not None %}
+                        <small class="text-light">
+                            Best {{ handicap_rounds_used }} of {{ handicap_rounds_considered }}
+                            eligible differentials from the last 20 rounds
+                        </small>
+                    {% else %}
+                        <small class="text-light">At least 3 eligible differentials are needed.</small>
+                    {% endif %}
                     {% if trend_metric is not None %}
                         {% if trend_metric < 0 %}
                             <span class="text-success small fw-bold">
